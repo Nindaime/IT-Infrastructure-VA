@@ -1,0 +1,151 @@
+Question Number,Option,Recommendation
+1,A,Excellent. Maintain your strong TLS configuration and review it annually against new best practices.
+1,B,Good. Consider implementing HSTS (HTTP Strict Transport Security) to further enhance security by preventing protocol downgrade attacks.
+1,C,"High Priority: Immediately deploy SSL/TLS across your entire website. Modern web traffic should be encrypted by default, not just on sensitive pages."
+1,D,Critical: Renew or fix your SSL/TLS certificate immediately. A broken certificate damages user trust and offers no protection.
+1,E,Critical: Procure and install an SSL/TLS certificate for your website immediately. Operating over HTTP is a major security risk to your users and your business.
+2,A,Excellent. Continue to monitor your automated patching system to ensure it is functioning correctly.
+2,B,"Good. To improve, investigate automated patching solutions to reduce the manual workload and shorten the time to patch."
+2,C,"High Priority: Implement a formal, regular patching schedule (at least weekly). Sporadic updates leave you vulnerable to known exploits."
+2,D,"Critical: Immediately implement a patch management process. Your website is almost certainly running software with known, severe vulnerabilities."
+2,E,Critical: Seek immediate technical assistance to establish an update and patch management process. This is a foundational security requirement.
+3,A,"Excellent. Your proactive approach with a managed, custom WAF provides superior protection. Ensure rules are reviewed regularly."
+3,B,Good. You have a solid layer of protection. Periodically review the WAF logs to understand the types of attacks being blocked.
+3,C,"Recommendation: Prioritize the implementation of a WAF. It is a critical defense layer against common, automated web attacks."
+3,D,High Priority: Investigate if your hosting provider offers a WAF and enable it. Understanding and using a WAF is key to web security.
+3,E,Critical: Implement a Web Application Firewall (WAF) as soon as possible to protect against common attacks like SQL Injection and Cross-Site Scripting (XSS).
+4,A,Excellent. This is the correct approach and provides robust protection against injection attacks.
+4,B,Good. Server-side validation is the most critical part. Ensure it covers all possible user inputs.
+4,C,"Critical: Immediately implement server-side validation. Frontend validation is a user experience feature, not a security control, as it can be easily bypassed."
+4,D,High Priority: Conduct a full review of your application and enforce server-side input validation on every single user-submitted field.
+4,E,Critical: Immediately implement server-side input validation across your entire application. This is a fundamental defense against many severe vulnerabilities.
+5,A,Excellent. This comprehensive approach provides strong defense against password-based attacks.
+5,B,"Good. To improve, enforce 2FA/MFA, especially for administrative accounts, to provide an additional layer of security."
+5,C,"Recommendation: Enhance your password policy to include complexity requirements (uppercase, lowercase, numbers, symbols)."
+5,D,Critical: Immediately implement and enforce a strong password policy requiring length and complexity. The current state is a high-risk invitation for account takeovers.
+5,E,Critical: Immediately create unique accounts for each administrator and user. Shared accounts are a major security risk that prevents accountability and effective access control.
+6,A,Excellent. Your backup strategy is robust and aligned with best practices for disaster recovery.
+6,B,Good. Ensure you periodically test restoring from your backups to verify their integrity.
+6,C,"High Priority: Implement an automated, regular backup schedule. Manual backups are unreliable and will lead to data loss."
+6,D,"Critical: Your backups are not viable. Immediately create a new backup and implement a regular, automated backup process with periodic restoration tests."
+6,E,"Critical: Implement a backup solution immediately. Without backups, any hardware failure, ransomware attack, or major error could permanently destroy your business data."
+7,A,Excellent. This is a mature and effective implementation of the principle of least privilege.
+7,B,Good. Regularly review the permissions of your administrator accounts to ensure they are still appropriate.
+7,C,High Priority: Conduct a review of all user accounts and revoke unnecessary privileges. Implement a formal process for granting and reviewing access.
+7,D,Critical: Immediately implement role-based access control. Start by creating a standard 'user' role with limited permissions and a separate 'admin' role.
+7,E,High Priority: Research and implement the Principle of Least Privilege. This foundational security concept means users should only have access to the information and functions essential to their job.
+8,A,Excellent. Your use of a strong CSP and other headers shows a mature approach to client-side security.
+8,B,"Good. To improve, research and implement a Content Security Policy (CSP) for defense-in-depth against XSS attacks."
+8,C,"Recommendation: Implement basic security headers like X-Frame-Options, X-Content-Type-Options, and Strict-Transport-Security (if you have HTTPS)."
+8,D,"High Priority: Research and implement security headers. They are a simple, free, and effective way to protect your users from common attacks."
+8,E,"High Priority: Implement security headers immediately, starting with X-Frame-Options to prevent clickjacking. They are a low-effort, high-impact security improvement."
+9,A,"Excellent. A real-time, automated inventory is the gold standard for asset management."
+9,B,"Good. This is a solid practice. To improve, try to review and validate the manual inventory on a quarterly basis to ensure accuracy."
+9,C,Recommendation: Dedicate time to complete your asset inventory. You cannot fully protect your network without knowing what is on it.
+9,D,"High Priority: Begin creating an asset inventory immediately. Start by listing all known computers, servers, and network devices."
+9,E,Critical: Creating a device inventory is your first step towards security. You must know what you need to protect. Start with a simple spreadsheet listing all office computers.
+10,A,Excellent. This is a very secure wireless configuration that separates trusted and untrusted traffic effectively.
+10,B,Good. This is a strong baseline for wireless security. Ensure the password is long and complex.
+10,C,"High Priority: Immediately change your Wi-Fi password to a long, complex passphrase that is not easily guessable."
+10,D,Critical: Immediately reconfigure your Wi-Fi to use WPA2 or WPA3 encryption with a strong password. An open or WEP network is dangerously insecure.
+10,E,"High Priority: Investigate your Wi-Fi settings immediately. If you don't know how, contact your IT support or service provider. Assume it is insecure until proven otherwise."
+11,A,Excellent. This practice significantly hardens your network infrastructure against unauthorized access.
+11,B,Good. This is a fundamental security requirement. Ensure the custom password used is strong and not reused elsewhere.
+11,C,"High Priority: Conduct an audit of all network devices (routers, switches, firewalls) and change any default passwords immediately."
+11,D,Critical: Change the default passwords on your network equipment immediately. This is one of the most common and easily exploited vulnerabilities.
+11,E,High Priority: Identify all your network devices and verify that their passwords have been changed from the default. Assume they are all at risk until verified.
+12,A,Excellent. A managed BYOD policy is the most secure way to allow personal devices on the network.
+12,B,"Good. This is a solid foundation. Consider enhancing the policy with minimum security requirements for personal devices (e.g., screen lock, up-to-date OS)."
+12,C,High Priority: Establish a formal Bring Your Own Device (BYOD) policy that outlines security expectations and acceptable use for personal devices on the network.
+12,D,"Recommendation: If you allow personal devices, you need a formal policy. If you truly ban them, consider technical controls to block unauthorized connections."
+12,E,High Priority: Decide on a formal stance for personal devices and document it in a policy. A lack of policy creates ambiguity and risk.
+13,A,Excellent. Network segmentation is a powerful control for containing threats and protecting critical assets.
+13,B,"Good. This is a great first step. Consider further segmentation, such as creating a separate VLAN for critical servers."
+13,C,Critical: Plan to segment your network as a high-priority project. A flat network means a single compromised device (like a laptop with malware) can potentially infect critical servers.
+13,D,High Priority: Research network segmentation (VLANs). It is a key architectural concept for building a defensible network.
+13,E,"High Priority: Investigate your network structure. If all devices can communicate with each other, you should plan to implement network segmentation to reduce risk."
+14,A,Excellent. Centrally managed endpoint protection is the most effective and scalable solution.
+14,B,Good. This provides a necessary layer of protection. Ensure all users keep their software up-to-date.
+14,C,"High Priority: Ensure every single company device has a reputable, paid anti-malware solution installed. Inconsistent coverage is a major risk."
+14,D,"High Priority: Install a reputable, third-party anti-malware solution on all computers. While OS protection is improving, it should be supplemented."
+14,E,Critical: Install reputable anti-malware software on all computers immediately. Operating without it is a near-guarantee for a malware infection.
+15,A,"Excellent. A dedicated, well-configured hardware firewall is a cornerstone of network security."
+15,B,"Good. Software firewalls provide protection. For better security, consider a dedicated hardware firewall at the network perimeter."
+15,C,"Recommendation: While better than nothing, a basic router firewall offers limited protection. Plan to upgrade to a dedicated hardware firewall for better control and visibility."
+15,D,Critical: Enable your firewall immediately with a 'deny all by default' policy. An open firewall is like leaving your front door unlocked and wide open.
+15,E,High Priority: Locate your primary network firewall (likely your internet router) and ensure it is enabled and configured to block unsolicited incoming traffic.
+16,A,Excellent. This demonstrates a mature security program and a strong security culture.
+16,B,"Good. This is a foundational governance document. To improve, schedule an annual review and a brief training session for all staff."
+16,C,Recommendation: Formalize your security policy and have it officially approved by management. An informal policy is not enforceable.
+16,D,High Priority: Develop a formal Information Security Policy. It is the central document that outlines your organization's commitment and rules for security.
+16,E,Critical: Develop and document an Information Security Policy as a top priority. This is the foundation of a structured security program.
+17,A,Excellent. This proactive approach to data protection and compliance is a sign of a mature organization.
+17,B,"Good. This is a necessary document. To improve, align it with a specific framework like the NDPR (Nigeria Data Protection Regulation) and communicate it to staff."
+17,C,High Priority: Formalize your data handling rules into a Data Protection Policy. Unwritten rules lead to inconsistencies and potential breaches.
+17,D,"High Priority: If you handle any personal data, you must understand your legal obligations. Research data protection regulations like the NDPR and create a policy."
+17,E,Critical: Create a Data Protection Policy immediately. Handling customer or employee data without a policy is a major legal and security risk.
+18,A,Excellent. A tested plan is a plan that will work in a real crisis. This is best practice.
+18,B,"Good. Having a documented plan is a critical piece of preparedness. To improve, schedule a simple tabletop drill to test it."
+18,C,High Priority: Formalize your notes into a structured Incident Response Plan. An informal plan will fall apart under pressure.
+18,D,Critical: Research and create an Incident Response Plan. It is a simple document outlining who to call and what steps to take when a breach occurs. Not having one turns a problem into a disaster.
+18,E,"Critical: Develop an Incident Response Plan immediately. In the event of a breach, having a plan can significantly reduce the cost, downtime, and reputational damage."
+19,A,Excellent. Enforcing strong password policies through technical controls is the most effective method.
+19,B,"Good. This sets a clear expectation. To improve, find ways to technically enforce the policy through your systems (e.g., Active Directory, Google Workspace)."
+19,C,"High Priority: Create a formal, written password policy that specifies minimum length, complexity, and other requirements. Communicate this policy to all employees."
+19,D,"Critical: Implement a formal password policy immediately. Without one, employees will default to simple, reusable passwords, creating a massive security risk."
+19,E,"High Priority: Establish and communicate a formal password policy. It's a simple, low-cost way to dramatically improve your security posture."
+20,A,Excellent. This ensures awareness and accountability across the organization.
+20,B,Good. This is a foundational IT governance document. Ensure new employees are made aware of it.
+20,C,High Priority: Formalize these rules into a written Acceptable Use Policy (AUP). This protects both the company and the employee by setting clear expectations.
+20,D,Critical: Create and implement an Acceptable Use Policy. This is a critical document for protecting company assets and reducing legal liability.
+20,E,High Priority: Develop an Acceptable Use Policy (AUP). This document defines how employees can use company technology and is a standard business practice.
+21,A,Excellent. This demonstrates a proactive and mature approach to managing compliance risk.
+21,B,"Good. This is a positive step. To improve, consider a third-party gap assessment to get an objective view of your compliance status."
+21,C,"High Priority: Take formal steps to meet your compliance obligations (e.g., NDPR). This may include appointing a Data Protection Officer (DPO) and creating required documentation."
+21,D,Critical: You must identify and comply with all relevant data protection and privacy regulations. Ignorance of the law is not a defense and can lead to severe penalties.
+21,E,"Critical: Immediately identify the data privacy laws and regulations that apply to your business (e.g., NDPR in Nigeria). Non-compliance can have severe financial consequences."
+22,A,"Excellent. A monitored IDS/IPS provides powerful, real-time insight into network threats."
+22,B,Good. You have the right technology in place. Ensure you have a process for regularly reviewing its logs and alerts.
+22,C,Recommendation: Consider implementing an IDS/IPS as your organization matures. Many modern firewalls have this functionality built-in.
+22,D,"Recommendation: Research Intrusion Detection/Prevention Systems. They act like a burglar alarm for your network, detecting and/or blocking malicious activity."
+22,E,"Recommendation: For improved threat visibility, investigate adding IDS/IPS capabilities, often included in modern Unified Threat Management (UTM) firewalls."
+23,A,Excellent. A well-configured SIEM is a sign of a mature security operations program.
+23,B,"Good. Centralizing logs is a great first step. To improve, investigate SIEM tools (some are open source) to automate the analysis of those logs."
+23,C,"High Priority: Implement a centralized logging solution. Without it, investigating a security incident is nearly impossible. This can be as simple as forwarding logs to a dedicated server."
+23,D,"Critical: Begin collecting security logs from your critical systems (firewalls, servers). Without logs, you are blind to what is happening on your network."
+23,E,Recommendation: Research Security Information and Event Management (SIEM). The core idea is to collect all security logs into one place for easier analysis.
+24,A,Excellent. This is the gold standard and the single most important defense against account takeover attacks.
+24,B,"Good. Protecting privileged accounts is the highest priority. Plan to expand MFA to all users, especially for email and critical applications."
+24,C,"High Priority: Change your MFA policy from 'optional' to 'mandatory' for all users, or at the very least, for all administrative and remote access accounts."
+24,D,"Recommendation: Re-evaluate your use of MFA. It should be applied to your most critical systems first, such as email, financial applications, and administrator logins."
+24,E,"Critical: Implement MFA immediately, starting with all administrative accounts and external-facing services like email. Passwords alone are no longer sufficient."
+25,A,Excellent. This comprehensive data protection strategy is aligned with modern best practices.
+25,B,High Priority: Implement encryption at rest for your sensitive data. This protects you if a physical server or hard drive is stolen.
+25,C,High Priority: Conduct a data audit to identify all locations of sensitive data and ensure it is encrypted both at rest and in transit.
+25,D,Critical: You must determine if and how your sensitive data is encrypted. Assume it is not protected and investigate immediately.
+25,E,Critical: Implement encryption for all sensitive data. Start with SSL/TLS for data in transit and then investigate options like database and full-disk encryption for data at rest.
+26,A,Excellent. This proactive combination of automated scanning and manual testing is the best practice for vulnerability management.
+26,B,"Good. This is a great proactive security measure. To mature your program, consider adding an annual third-party penetration test to find more complex vulnerabilities."
+26,C,"Recommendation: Implement a regular, recurring schedule for vulnerability scans (e.g., quarterly). Security is a process, not a one-time event."
+26,D,High Priority: Research and conduct a vulnerability scan of your network and website. There are many affordable and free tools available to get started.
+26,E,Critical: Begin a vulnerability management program immediately by running a scan on your external-facing systems. You need to find your security holes before an attacker does.
+27,A,Excellent. This is the gold standard for building a security-aware culture and a strong human firewall.
+27,B,"Good. This is a solid foundation. To improve, implement annual refresher training and consider periodic phishing tests."
+27,C,"High Priority: Implement a formal, structured security awareness training program for all employees. Occasional emails are not effective."
+27,D,Critical: This assumption is incorrect and dangerous. Immediately implement a security awareness training program for all staff. Humans are a primary target for attackers.
+27,E,"Critical: Implement a security awareness training program immediately. Your employees are your first line of defense, and they need to be trained to spot and report threats."
+28,A,Excellent. Your process ensures that data leakage from disposed assets is highly unlikely.
+28,B,"Good. This is a solid practice. For higher security, consider using data destruction software that overwrites the data multiple times."
+28,C,Critical: Immediately change your process. 'Deleting' files does not remove them. You must use a secure data wiping tool to sanitize hard drives before disposal.
+28,D,Critical: Stop this practice immediately. You are leaking sensitive company and customer data. All storage devices must be securely wiped or physically destroyed before disposal.
+28,E,High Priority: Establish a formal policy and process for asset disposal that includes secure data wiping or physical destruction of storage media.
+29,A,Excellent. An automated and rapid patch management process is a sign of a mature security program.
+29,B,"Good. A disciplined manual process is effective. To improve, look into patch management tools that can automate the deployment and reporting."
+29,C,"High Priority: Move from a reactive 'break-fix' model to a proactive, scheduled patching process. Waiting for a problem means you are already compromised."
+29,D,Critical: Implement a formal patch management process immediately. Unpatched systems are the most common way attackers gain entry to a network.
+29,E,Critical: Designate a person or team responsible for applying security patches and task them with creating a monthly schedule. This is a fundamental security task.
+30,A,Excellent. This demonstrates a mature and effective access control program.
+30,B,"Good. This is a foundational access control practice. To improve, implement a process for periodically reviewing user access rights (e.g., annually)."
+30,C,"High Priority: Implement a regular access review process (e.g., quarterly or annually) to identify and revoke unnecessary permissions from all user accounts."
+30,D,"Critical: Immediately begin a project to implement the Principle of Least Privilege. Start by identifying data types and creating user roles with appropriate, limited access."
+30,E,High Priority: Research and implement the Principle of Least Privilege. This foundational security concept means users should only have access to what they need to do their jobs.

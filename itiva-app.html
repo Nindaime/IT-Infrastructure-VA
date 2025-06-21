@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ITIVA - IT Infrastructure Vulnerability Assessment</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Vue.js 3 -->
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <!-- Google Fonts: Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        /* Applying Inter font to the entire application */
+        body {
+            font-family: 'Inter', sans-serif;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+        /* Simple transition for smoother page changes */
+        .fade-enter-active, .fade-leave-active {
+            transition: opacity 0.3s ease;
+        }
+        .fade-enter-from, .fade-leave-to {
+            opacity: 0;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-800">
+
+    <div id="app">
+        <!-- Main Vue App will be mounted here -->
+    </div>
+
+    <script type="module">
+        const { createApp, ref, defineComponent } = Vue;
+
+        // --- SVG Icons (as components for reusability) ---
+        const ShieldCheckIcon = {
+            template: `<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>`
+        };
+        const ChartBarIcon = {
+            template: `<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>`
+        };
+         const DocumentTextIcon = {
+            template: `<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>`
+        };
+
+        // --- HomePage Component ---
+        const HomePage = defineComponent({
+            name: 'HomePage',
+            components: { ShieldCheckIcon, ChartBarIcon, DocumentTextIcon },
+            emits: ['navigate'],
+            template: `
+                <div class="w-full">
+                    <!-- Header Navigation -->
+                    <header class="bg-white shadow-sm sticky top-0 z-50">
+                        <div class="container mx-auto px-6 py-4 flex justify-between items-center">
+                            <div class="text-2xl font-bold text-gray-800">
+                                IT<span class="text-blue-600">I</span>VA
+                            </div>
+                            <nav class="hidden md:flex items-center space-x-8">
+                                <a href="#" class="text-gray-600 hover:text-blue-600 transition-colors">Home</a>
+                                <a href="#how-it-works" class="text-gray-600 hover:text-blue-600 transition-colors">How It Works</a>
+                                <a href="#features" class="text-gray-600 hover:text-blue-600 transition-colors">Features</a>
+                            </nav>
+                            <div class="flex items-center space-x-4">
+                               <button @click="$emit('navigate', 'LoginPage')" class="hidden md:block text-gray-600 hover:text-blue-600 font-medium transition-colors">Login</button>
+                               <button @click="$emit('navigate', 'LoginPage')" class="bg-blue-600 text-white font-bold py-2 px-5 rounded-lg hover:bg-blue-700 transition-transform transform hover:scale-105 shadow-lg">
+                                   Get Started
+                               </button>
+                            </div>
+                        </div>
+                    </header>
+
+                    <!-- Hero Section -->
+                    <main class="bg-white">
+                        <div class="container mx-auto px-6 py-20 md:py-32 text-center">
+                            <h1 class="text-4xl md:text-6xl font-extrabold text-gray-900 leading-tight mb-4">
+                                Assess Your IT Vulnerabilities with <span class="text-blue-600">AI-Powered</span> Precision
+                            </h1>
+                            <p class="text-lg md:text-xl text-gray-600 max-w-3xl mx-auto mb-8">
+                                ITIVA (IT Infrastructure Vulnerability Assessment) is an intelligent platform that helps businesses in Nigeria and beyond identify, analyze, and mitigate security risks across their digital infrastructure.
+                            </p>
+                            <button @click="$emit('navigate', 'LoginPage')" class="bg-blue-600 text-white font-bold py-4 px-8 rounded-lg text-lg hover:bg-blue-700 transition-transform transform hover:scale-105 shadow-xl">
+                                Start Your Free Assessment
+                            </button>
+                        </div>
+                    </main>
+
+                    <!-- How It Works Section -->
+                    <section id="how-it-works" class="py-20 bg-gray-50">
+                        <div class="container mx-auto px-6">
+                            <div class="text-center mb-16">
+                                <h2 class="text-3xl md:text-4xl font-bold text-gray-800">How Vulnerability Assessment Works</h2>
+                                <p class="text-gray-600 mt-4 max-w-2xl mx-auto">A simple, streamlined process to give you a comprehensive security overview.</p>
+                            </div>
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-10">
+                                <!-- Step 1 -->
+                                <div class="bg-white p-8 rounded-xl shadow-md text-center hover:shadow-xl transition-shadow">
+                                    <div class="bg-blue-100 text-blue-600 rounded-full h-16 w-16 flex items-center justify-center mx-auto mb-6">
+                                        <DocumentTextIcon />
+                                    </div>
+                                    <h3 class="text-xl font-bold mb-2">1. Register & Answer</h3>
+                                    <p class="text-gray-600">Create your business profile and complete our straightforward, 30-question assessment covering your website, network, compliance, and security tools.</p>
+                                </div>
+                                <!-- Step 2 -->
+                                <div class="bg-white p-8 rounded-xl shadow-md text-center hover:shadow-xl transition-shadow">
+                                    <div class="bg-blue-100 text-blue-600 rounded-full h-16 w-16 flex items-center justify-center mx-auto mb-6">
+                                        <ChartBarIcon />
+                                    </div>
+                                    <h3 class="text-xl font-bold mb-2">2. AI-Powered Analysis</h3>
+                                    <p class="text-gray-600">Our system, leveraging Gemini AI, analyzes your answers against our comprehensive marking grid to calculate your vulnerability score for each category.</p>
+                                </div>
+                                <!-- Step 3 -->
+                                <div class="bg-white p-8 rounded-xl shadow-md text-center hover:shadow-xl transition-shadow">
+                                    <div class="bg-blue-100 text-blue-600 rounded-full h-16 w-16 flex items-center justify-center mx-auto mb-6">
+                                        <ShieldCheckIcon />
+                                    </div>
+                                    <h3 class="text-xl font-bold mb-2">3. Get Actionable Insights</h3>
+                                    <p class="text-gray-600">Receive an instant, detailed report with a visual Radar Chart, component scores, and clear, prioritized recommendations to strengthen your security posture.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+                    
+                    <!-- Features Section -->
+                    <section id="features" class="py-20 bg-white">
+                         <div class="container mx-auto px-6">
+                             <div class="text-center mb-16">
+                                <h2 class="text-3xl md:text-4xl font-bold text-gray-800">Platform Features</h2>
+                                <p class="text-gray-600 mt-4 max-w-2xl mx-auto">Tools designed for clarity and action.</p>
+                            </div>
+                            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+                                <div class="bg-gray-50 p-6 rounded-lg">
+                                    <h4 class="font-bold text-lg mb-2 text-blue-700">User Dashboard</h4>
+                                    <p class="text-gray-600 text-sm">Fill out business details, take the assessment, and view your results all in one place.</p>
+                                </div>
+                                <div class="bg-gray-50 p-6 rounded-lg">
+                                    <h4 class="font-bold text-lg mb-2 text-blue-700">Visual Reports</h4>
+                                    <p class="text-gray-600 text-sm">Instantly understand your security posture with an intuitive Radar Chart and detailed scores.</p>
+                                </div>
+                                <div class="bg-gray-50 p-6 rounded-lg">
+                                    <h4 class="font-bold text-lg mb-2 text-blue-700">Downloadable PDF</h4>
+                                    <p class="text-gray-600 text-sm">Export your full assessment report, including recommendations, for offline review and sharing.</p>
+                                </div>
+                                <div class="bg-gray-50 p-6 rounded-lg">
+                                    <h4 class="font-bold text-lg mb-2 text-blue-700">Admin Security Map</h4>
+                                    <p class="text-gray-600 text-sm">Admins can view a national security landscape, visualizing vulnerabilities by location.</p>
+                                </div>
+                            </div>
+                         </div>
+                    </section>
+
+
+                    <!-- Footer -->
+                    <footer class="bg-gray-800 text-white">
+                        <div class="container mx-auto px-6 py-8 text-center">
+                            <p>&copy; ${new Date().getFullYear()} ITIVA. All rights reserved.</p>
+                            <p class="text-sm text-gray-400 mt-2">Your Partner in Digital Security in Nigeria.</p>
+                        </div>
+                    </footer>
+                </div>
+            `
+        });
+
+        // --- LoginPage Component ---
+        const LoginPage = defineComponent({
+            name: 'LoginPage',
+            emits: ['navigate'],
+            setup() {
+                const activeTab = ref('login'); // 'login' or 'register'
+                return { activeTab };
+            },
+            template: `
+                <div class="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-4">
+                     <div @click="$emit('navigate', 'HomePage')" class="cursor-pointer mb-8 text-3xl font-bold text-gray-800">
+                        IT<span class="text-blue-600">I</span>VA
+                    </div>
+                    <div class="w-full max-w-md bg-white rounded-2xl shadow-xl p-8">
+                        <!-- Tabs -->
+                        <div class="flex border-b border-gray-200 mb-8">
+                            <button @click="activeTab = 'login'"
+                                :class="['w-1/2 py-4 text-center font-medium text-lg transition-colors', activeTab === 'login' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500 hover:text-gray-700']">
+                                Login
+                            </button>
+                            <button @click="activeTab = 'register'"
+                                :class="['w-1/2 py-4 text-center font-medium text-lg transition-colors', activeTab === 'register' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500 hover:text-gray-700']">
+                                Register
+                            </button>
+                        </div>
+
+                        <!-- Login Form -->
+                        <div v-if="activeTab === 'login'">
+                            <form @submit.prevent>
+                                <div class="mb-4">
+                                    <label for="login-email" class="block text-sm font-medium text-gray-700 mb-1">Email Address</label>
+                                    <input type="email" id="login-email" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500" placeholder="you@example.com">
+                                </div>
+                                <div class="mb-6">
+                                    <label for="login-password" class="block text-sm font-medium text-gray-700 mb-1">Password</label>
+                                    <input type="password" id="login-password" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500" placeholder="••••••••">
+                                     <a href="#" class="text-sm text-blue-600 hover:underline mt-2 block text-right">Forgot Password?</a>
+                                </div>
+                                <button type="submit" class="w-full bg-blue-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-blue-700 transition-colors shadow-lg">Login</button>
+                            </form>
+                        </div>
+
+                        <!-- Register Form -->
+                        <div v-if="activeTab === 'register'">
+                             <form @submit.prevent>
+                                <div class="mb-4">
+                                    <label for="register-name" class="block text-sm font-medium text-gray-700 mb-1">Business Name</label>
+                                    <input type="text" id="register-name" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500" placeholder="Your Company Ltd.">
+                                </div>
+                                <div class="mb-4">
+                                    <label for="register-email" class="block text-sm font-medium text-gray-700 mb-1">Email Address</label>
+                                    <input type="email" id="register-email" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500" placeholder="you@example.com">
+                                </div>
+                                <div class="mb-6">
+                                    <label for="register-password" class="block text-sm font-medium text-gray-700 mb-1">Password</label>
+                                    <input type="password" id="register-password" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500" placeholder="Create a strong password">
+                                </div>
+                                <button type="submit" class="w-full bg-blue-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-blue-700 transition-colors shadow-lg">Create Account</button>
+                            </form>
+                        </div>
+                        
+                        <!-- Social Logins -->
+                        <div class="mt-8">
+                            <div class="relative">
+                                <div class="absolute inset-0 flex items-center">
+                                    <div class="w-full border-t border-gray-300"></div>
+                                </div>
+                                <div class="relative flex justify-center text-sm">
+                                    <span class="px-2 bg-white text-gray-500">Or continue with</span>
+                                </div>
+                            </div>
+                            <div class="mt-6 grid grid-cols-2 gap-3">
+                                <div>
+                                    <a href="#" class="w-full inline-flex justify-center py-3 px-4 border border-gray-300 rounded-lg shadow-sm bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
+                                        <span class="sr-only">Sign in with Google</span>
+                                        <svg class="w-5 h-5" aria-hidden="true" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 0C4.477 0 0 4.477 0 10c0 4.418 2.865 8.14 6.839 9.491.5.092.682-.217.682-.482 0-.237-.009-.868-.014-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.031-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0110 4.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.378.203 2.398.1 2.651.64.7 1.03 1.595 1.03 2.688 0 3.848-2.338 4.695-4.566 4.942.359.308.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.578.688.482A10.001 10.001 0 0020 10c0-5.523-4.477-10-10-10z" clip-rule="evenodd" /></svg>
+                                        <span class="ml-2">Google</span>
+                                    </a>
+                                </div>
+                                 <div>
+                                    <a href="#" class="w-full inline-flex justify-center py-3 px-4 border border-gray-300 rounded-lg shadow-sm bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
+                                        <span class="sr-only">Sign in with Apple</span>
+                                        <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path d="M10.325 4.312c-.932 0-1.612.383-2.115.937a.539.539 0 00-.16.339c-.015.114.032.23.13.313.1.087.23.125.364.11.312-.02.624-.03.936-.03.547 0 1.095.087 1.642.264.547.177.994.467 1.342.868.348.4.522.883.522 1.45 0 .55-.174 1.018-.522 1.403a2.383 2.383 0 01-1.342.79c-.547.145-1.095.218-1.642.218-.312 0-.624-.01-.936-.03a.5.5 0 00-.364.11c-.1.083-.145.2-.13.313.015.118.063.224.16.319.503.554 1.183.937 2.115.937.562 0 1.156-.145 1.78-.437a4.135 4.135 0 001.527-1.24c.422-.58.633-1.24.633-1.98 0-.74-.21-1.398-.633-1.979a4.12 4.12 0 00-1.528-1.24c-.624-.292-1.218-.438-1.78-.438zm-1.48 9.018c-.347.437-.8.76-1.36.968-.56.208-1.15.312-1.77.312-1.26 0-2.3- informants.438-3.12-1.313-.82-.875-1.23-1.968-1.23-3.28 0-1.313.4-2.407 1.2-3.28.8-.876 1.81-1.313 3.03-1.313.563 0 1.1.096 1.61.288.51.192.93.49 1.26.892-.266.16-.5.35-.7.57-.2.22-.3.46-.3.72 0 .42.14.77.42 1.05.28.28.63.42 1.05.42.312 0 .6-.05.87-.15.015.04.03.08.04.12.19.6.28 1.2.28 1.8 0 .8-.23 1.5-.7 2.1z"/></svg>
+                                        <span class="ml-2">Apple</span>
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <p class="mt-8 text-center text-sm text-gray-500">
+                        Don't have an account? 
+                        <a href="#" @click.prevent="activeTab = 'register'" class="font-medium text-blue-600 hover:underline">
+                             Sign up
+                        </a>
+                    </p>
+                </div>
+            `
+        });
+
+
+        // --- Main App Component ---
+        const App = defineComponent({
+            name: 'App',
+            components: { HomePage, LoginPage },
+            setup() {
+                // Manages which page is currently visible
+                const currentPage = ref('HomePage'); // 'HomePage' or 'LoginPage'
+
+                function navigateTo(page) {
+                    currentPage.value = page;
+                }
+                
+                return {
+                    currentPage,
+                    navigateTo
+                };
+            },
+            template: `
+                <div>
+                    <transition name="fade" mode="out-in">
+                        <component :is="currentPage" @navigate="navigateTo"></component>
+                    </transition>
+                </div>
+            `
+        });
+        
+        // Mount the Vue application to the #app element in the DOM
+        createApp(App).mount('#app');
+
+    </script>
+</body>
+</html>

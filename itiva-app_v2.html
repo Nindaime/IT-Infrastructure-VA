@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ITIVA - IT Infrastructure Vulnerability Assessment</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Vue.js 3 -->
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <!-- Chart.js for Radar Chart -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Google Fonts: Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+        .fade-enter-active, .fade-leave-active {
+            transition: opacity 0.3s ease;
+        }
+        .fade-enter-from, .fade-leave-to {
+            opacity: 0;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-800">
+
+    <div id="app">
+        <!-- Main Vue App will be mounted here -->
+    </div>
+
+    <script type="module">
+        const { createApp, ref, computed, onMounted, defineComponent } = Vue;
+
+        // --- MOCK DATA ---
+        const mockQuestions = [
+            // Category 1: Website Strength (8 Qs)
+            { id: 1, category: 'Website Strength', text: 'Is your website traffic encrypted using a valid and current SSL/TLS certificate (HTTPS)?', options: ['Yes, on all pages, with HSTS enabled', 'Yes, standard certificate on all pages', 'Only on sensitive pages', 'Certificate is expired/misconfigured', 'No, we use HTTP only'] },
+            { id: 2, category: 'Website Strength', text: 'How often are your website\'s software components (CMS, plugins) updated?', options: ['Automatically within 48 hours', 'Weekly', 'Sporadically', 'Rarely or never', 'I don\'t know'] },
+            // ... (Add 6 more questions for this category)
+            { id: 8, category: 'Website Strength', text: 'Have you implemented security headers like CSP?', options: ['Yes, a strong CSP', 'Yes, basic headers', 'Aware but not implemented', 'What are security headers?', 'No'] },
+            
+            // Category 2: Devices & Network (7 Qs)
+            { id: 9, category: 'Devices & Network', text: 'Do you maintain an up-to-date inventory of all devices on your network?', options: ['Yes, automated real-time inventory', 'Yes, a manual spreadsheet', 'Partial or outdated inventory', 'I don\'t know', 'No inventory'] },
+            // ... (Add 6 more questions for this category)
+            { id: 15, category: 'Devices & Network', text: 'Is a firewall configured to block unsolicited incoming traffic?', options: ['Yes, dedicated hardware firewall', 'Yes, software firewalls on endpoints', 'Only the default router firewall', 'Firewall is disabled', 'I don\'t know'] },
+
+            // Category 3: Compliance Documentation (6 Qs)
+            { id: 16, category: 'Compliance Documentation', text: 'Do you have a formally documented Information Security Policy?', options: ['Yes, reviewed annually and trained on', 'Yes, a documented policy exists', 'Informal or outdated version', 'I don\'t know', 'No'] },
+            // ... (Add 5 more questions for this category)
+            { id: 21, category: 'Compliance Documentation', text: 'Are your data handling practices compliant with relevant regulations?', options: ['Yes, formally audited', 'We believe we are compliant', 'Aware but no formal steps taken', 'Not aware of regulations', 'I don\'t know'] },
+
+            // Category 4: Cyber Security Implementations (9 Qs)
+            { id: 22, category: 'Cyber Security Implementations', text: 'Do you use an Intrusion Detection/Prevention System (IDS/IPS)?', options: ['Yes, managed and monitored', 'Yes, a device is running', 'Planning to implement', 'What is an IDS/IPS?', 'No'] },
+            // ... (Add 8 more questions for this category)
+            { id: 30, category: 'Cyber Security Implementations', text: 'Is access to sensitive data restricted based on the principle of least privilege?', options: ['Yes, strictly controlled and reviewed', 'Yes, basic roles exist', 'Access granted but rarely revoked', 'Most employees have access to most data', 'I don\'t know'] }
+        ];
+
+        const mockRankings = [
+            { rank: 1, name: 'Innovate UK Ltd.', score: 89, location: 'London', type: 'FinTech' },
+            { rank: 2, name: 'Manchester Tech Co.', score: 85, location: 'Manchester', type: 'SaaS' },
+            { rank: 3, name: 'Bristol Digital Agency', score: 82, location: 'Bristol', type: 'Marketing' },
+            { rank: 4, name: 'Cambridge AI Solutions', score: 79, location: 'Cambridge', type: 'AI/ML' },
+            { rank: 5, name: 'Secure Hosting UK', score: 78, location: 'London', type: 'IT Services' },
+            { rank: 6, name: 'Birmingham Logistics', score: 75, location: 'Birmingham', type: 'Logistics' },
+            { rank: 7, name: 'Leeds E-commerce', score: 71, location: 'Leeds', type: 'E-commerce' },
+            { rank: 8, name: 'Oxford EduTech', score: 68, location: 'Oxford', type: 'Education' },
+            { rank: 9, name: 'Glasgow Creative', score: 65, location: 'Glasgow', type: 'Creative' },
+            { rank: 10, name: 'Data Insights London', score: 64, location: 'London', type: 'Data Analytics' },
+        ];
+        
+        // --- SVG Icons ---
+        const ShieldCheckIcon = { template: `<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>` };
+        const ChartBarIcon = { template: `<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>` };
+        const DocumentTextIcon = { template: `<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>` };
+        const GoogleIcon = { template: `<svg class="w-5 h-5" aria-hidden="true" fill="currentColor" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/><path d="M1 1h22v22H1z" fill="none"/></svg>`};
+        const FacebookIcon = { template: `<svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M22 12c0-5.523-4.477-10-10-10S2 6.477 2 12c0 4.991 3.657 9.128 8.438 9.878V14.89h-2.54V12h2.54V9.797c0-2.506 1.492-3.89 3.777-3.89 1.094 0 2.238.195 2.238.195v2.46h-1.26c-1.243 0-1.63.771-1.63 1.562V12h2.773l-.443 2.89h-2.33V21.88C18.343 21.128 22 16.991 22 12z"></svg>`};
+
+        // --- App Components ---
+        const Header = defineComponent({
+            props: ['isLoggedIn'],
+            emits: ['navigate', 'logout'],
+            template: `
+                <header class="bg-white shadow-sm sticky top-0 z-50">
+                    <div class="container mx-auto px-6 py-4 flex justify-between items-center">
+                        <div @click="$emit('navigate', 'HomePage')" class="cursor-pointer text-2xl font-bold text-gray-800">
+                            IT<span class="text-blue-600">I</span>VA
+                        </div>
+                        <nav class="hidden md:flex items-center space-x-8">
+                            <a @click.prevent="$emit('navigate', 'HomePage')" href="#" class="text-gray-600 hover:text-blue-600 transition-colors">Home</a>
+                            <a @click.prevent="$emit('navigate', 'AboutUsPage')" href="#" class="text-gray-600 hover:text-blue-600 transition-colors">About Us</a>
+                            <a v-if="isLoggedIn" @click.prevent="$emit('navigate', 'DashboardPage')" href="#" class="text-gray-600 hover:text-blue-600 transition-colors">Dashboard</a>
+                        </nav>
+                        <div v-if="!isLoggedIn" class="flex items-center space-x-4">
+                           <button @click="$emit('navigate', 'LoginPage')" class="hidden md:block text-gray-600 hover:text-blue-600 font-medium transition-colors">Login</button>
+                           <button @click="$emit('navigate', 'LoginPage')" class="bg-blue-600 text-white font-bold py-2 px-5 rounded-lg hover:bg-blue-700 transition-transform transform hover:scale-105 shadow-lg">
+                               Get Started
+                           </button>
+                        </div>
+                        <div v-if="isLoggedIn" class="flex items-center space-x-4">
+                           <button @click="$emit('logout')" class="bg-red-500 text-white font-bold py-2 px-5 rounded-lg hover:bg-red-600 transition-transform transform hover:scale-105 shadow-lg">
+                               Logout
+                           </button>
+                        </div>
+                    </div>
+                </header>`
+        });
+        
+        const Footer = defineComponent({
+            template: `<footer class="bg-gray-800 text-white">
+                        <div class="container mx-auto px-6 py-8 text-center">
+                            <p>&copy; ${new Date().getFullYear()} ITIVA. All rights reserved.</p>
+                            <p class="text-sm text-gray-400 mt-2">Your Partner in Digital Security in UK.</p>
+                        </div>
+                    </footer>`
+        });
+
+        const HomePage = defineComponent({
+            name: 'HomePage',
+            components: { Header, Footer, ShieldCheckIcon, ChartBarIcon, DocumentTextIcon },
+            props: ['isLoggedIn'],
+            emits: ['navigate', 'logout'],
+            setup() {
+                const rankingFilter = ref('location'); // 'location' or 'type'
+                const rankings = ref(mockRankings);
+
+                const filteredRankings = computed(() => {
+                    // This is a simple grouping simulation
+                    const grouped = rankings.value.reduce((acc, rank) => {
+                        const key = rank[rankingFilter.value];
+                        if (!acc[key]) acc[key] = [];
+                        acc[key].push(rank);
+                        return acc;
+                    }, {});
+                    return grouped;
+                });
+                
+                return { rankingFilter, filteredRankings };
+            },
+            template: `
+                <div class="w-full">
+                    <Header :is-logged-in="isLoggedIn" @navigate="$emit('navigate', $event)" @logout="$emit('logout')" />
+                    <main class="bg-white">
+                        <div class="container mx-auto px-6 py-20 md:py-32 text-center">
+                            <h1 class="text-4xl md:text-6xl font-extrabold text-gray-900 leading-tight mb-4">
+                                Assess Your IT Vulnerabilities with <span class="text-blue-600">AI-Powered</span> Precision
+                            </h1>
+                            <p class="text-lg md:text-xl text-gray-600 max-w-3xl mx-auto mb-8">
+                                ITIVA (IT Infrastructure Vulnerability Assessment) is an intelligent platform that helps businesses in the UK identify, analyze, and mitigate security risks across their digital infrastructure.
+                            </p>
+                            <button @click="$emit('navigate', 'LoginPage')" class="bg-blue-600 text-white font-bold py-4 px-8 rounded-lg text-lg hover:bg-blue-700 transition-transform transform hover:scale-105 shadow-xl">
+                                Start Your Free Assessment
+                            </button>
+                        </div>
+                    </main>
+
+                    <!-- Top Businesses Ranking Section -->
+                    <section id="rankings" class="py-20 bg-gray-50">
+                        <div class="container mx-auto px-6">
+                            <div class="text-center mb-12">
+                                <h2 class="text-3xl md:text-4xl font-bold text-gray-800">Top 10 Secure Businesses in the UK</h2>
+                                <p class="text-gray-600 mt-4 max-w-2xl mx-auto">Discover the top-ranked businesses based on their comprehensive ITIVA vulnerability score.</p>
+                                <div class="mt-6">
+                                    <span class="mr-4 text-gray-700 font-medium">Group by:</span>
+                                    <button @click="rankingFilter = 'location'" :class="['px-4 py-2 rounded-lg mr-2 transition', rankingFilter === 'location' ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-100']">Location</button>
+                                    <button @click="rankingFilter = 'type'" :class="['px-4 py-2 rounded-lg transition', rankingFilter === 'type' ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-100']">Business Type</button>
+                                </div>
+                            </div>
+
+                            <div v-for="(group, groupName) in filteredRankings" :key="groupName" class="mb-8">
+                                <h3 class="text-2xl font-bold mb-4 text-gray-700 border-b pb-2">{{ groupName }}</h3>
+                                <div class="overflow-x-auto">
+                                    <table class="min-w-full bg-white rounded-lg shadow-md">
+                                        <thead>
+                                            <tr class="w-full bg-gray-100 text-left text-gray-600 uppercase text-sm leading-normal">
+                                                <th class="py-3 px-6 text-center">Rank</th>
+                                                <th class="py-3 px-6">Business Name</th>
+                                                <th class="py-3 px-6 text-center">Score</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody class="text-gray-700 text-sm font-light">
+                                            <tr v-for="item in group" :key="item.rank" class="border-b border-gray-200 hover:bg-gray-50">
+                                                <td class="py-3 px-6 text-center">
+                                                    <span class="bg-blue-200 text-blue-700 font-bold py-1 px-3 rounded-full text-xs">{{ item.rank }}</span>
+                                                </td>
+                                                <td class="py-3 px-6 font-medium">{{ item.name }}</td>
+                                                <td class="py-3 px-6 text-center font-bold text-green-600">{{ item.score }}</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+                    <Footer />
+                </div>
+            `
+        });
+
+        const AboutUsPage = defineComponent({
+            name: 'AboutUsPage',
+            components: { Header, Footer },
+            props: ['isLoggedIn'],
+            emits: ['navigate', 'logout'],
+            setup() {
+                const team = [
+                    { name: 'Dr. Evelyn Reed', role: 'Founder & Lead Security Architect', img: 'https://placehold.co/400x400/E2E8F0/4A5568?text=E.R' },
+                    { name: 'James Carter', role: 'Head of Penetration Testing', img: 'https://placehold.co/400x400/E2E8F0/4A5568?text=J.C' },
+                    { name: 'Aisha Adebayo', role: 'Compliance & GDPR Specialist', img: 'https://placehold.co/400x400/E2E8F0/4A5568?text=A.A' },
+                    { name: 'Ben Williams', role: 'Lead Frontend Developer', img: 'https://placehold.co/400x400/E2E8F0/4A5568?text=B.W' }
+                ];
+                return { team };
+            },
+            template: `
+                <div class="w-full">
+                     <Header :is-logged-in="isLoggedIn" @navigate="$emit('navigate', $event)" @logout="$emit('logout')" />
+                     <main class="bg-white py-16 px-6">
+                        <div class="container mx-auto">
+                            <div class="text-center mb-16">
+                                <h1 class="text-4xl md:text-5xl font-extrabold text-gray-900">About ITIVA</h1>
+                                <p class="text-lg text-gray-600 mt-4 max-w-3xl mx-auto">We are a dedicated team of cybersecurity professionals committed to making the digital world safer for businesses in the UK.</p>
+                            </div>
+
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-16 items-center mb-20">
+                               <div>
+                                   <h3 class="text-2xl font-bold text-gray-800 mb-4">Our Mission & Experience</h3>
+                                   <p class="text-gray-600 mb-4">Our mission is to empower businesses with the knowledge and tools to proactively defend against cyber threats. With over 20 years of combined experience in cybersecurity, our team holds industry-leading certifications including CISSP, OSCP, and CISM. We blend automated intelligence with expert human insight to deliver unparalleled vulnerability assessments.</p>
+                                   <p class="text-gray-600">We believe that robust security should be accessible to all businesses, not just large corporations. ITIVA was born from this belief, providing an affordable, intuitive, and powerful platform for self-assessment.</p>
+                               </div>
+                               <div class="w-full h-80 rounded-lg shadow-xl overflow-hidden">
+                                    <!-- Google Maps Embed -->
+                                    <iframe 
+                                        src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d2179.991209591494!2d-2.102372023377779!3d57.11796197371929!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x488410313f898139%3A0x24f31c7739556b10!2sRobert%20Gordon%20University!5e0!3m2!1sen!2suk!4v1718844838631!5m2!1sen!2suk" 
+                                        width="100%" 
+                                        height="100%" 
+                                        style="border:0;" 
+                                        allowfullscreen="" 
+                                        loading="lazy" 
+                                        referrerpolicy="no-referrer-when-downgrade">
+                                    </iframe>
+                               </div>
+                            </div>
+                            
+                             <div class="text-center mb-12">
+                                <h2 class="text-3xl font-bold text-gray-800">Meet the Team</h2>
+                            </div>
+                            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+                                <div v-for="member in team" :key="member.name" class="text-center">
+                                    <img :src="member.img" class="w-40 h-40 rounded-full mx-auto mb-4 shadow-lg bg-gray-200">
+                                    <h4 class="text-xl font-bold text-gray-800">{{ member.name }}</h4>
+                                    <p class="text-gray-600">{{ member.role }}</p>
+                                </div>
+                            </div>
+                        </div>
+                     </main>
+                    <Footer />
+                </div>
+            `
+        });
+
+        const LoginPage = defineComponent({
+            name: 'LoginPage',
+            components: { GoogleIcon, FacebookIcon },
+            emits: ['navigate', 'login'],
+            setup(_, { emit }) {
+                const activeTab = ref('login');
+                const registrationData = ref({ name: '', email: '', password: '', businessName: '', businessObjective: '', website: '', address: '' });
+
+                function handleLogin() {
+                    // In a real app, this would make an API call
+                    console.log('Logging in...');
+                    emit('login');
+                }
+                
+                function handleRegister() {
+                    // In a real app, this would make an API call with registrationData
+                    console.log('Registering with data:', registrationData.value);
+                    emit('login'); // Simulate login after registration
+                }
+                
+                // Placeholder for Google Maps Autocomplete
+                onMounted(() => {
+                    // A real implementation would initialize the Google Maps Places API here
+                    // to attach to the #register-address input.
+                    // e.g. new google.maps.places.Autocomplete(document.getElementById('register-address'));
+                    console.log('LoginPage mounted. Google Maps API would initialize here.');
+                });
+
+                return { activeTab, registrationData, handleLogin, handleRegister };
+            },
+            template: `
+                 <div class="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-4">
+                     <div @click="$emit('navigate', 'HomePage')" class="cursor-pointer mb-8 text-3xl font-bold text-gray-800">
+                        IT<span class="text-blue-600">I</span>VA
+                    </div>
+                    <div class="w-full max-w-md bg-white rounded-2xl shadow-xl p-8">
+                        <div class="flex border-b border-gray-200 mb-8">
+                            <button @click="activeTab = 'login'" :class="['w-1/2 py-4 text-center font-medium text-lg transition-colors', activeTab === 'login' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500 hover:text-gray-700']">Login</button>
+                            <button @click="activeTab = 'register'" :class="['w-1/2 py-4 text-center font-medium text-lg transition-colors', activeTab === 'register' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500 hover:text-gray-700']">Register</button>
+                        </div>
+
+                        <!-- Login Form -->
+                        <div v-if="activeTab === 'login'">
+                            <form @submit.prevent="handleLogin">
+                                <div class="mb-4"><label for="login-email" class="block text-sm font-medium text-gray-700 mb-1">Email</label><input type="email" id="login-email" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500" placeholder="you@example.com"></div>
+                                <div class="mb-6"><label for="login-password" class="block text-sm font-medium text-gray-700 mb-1">Password</label><input type="password" id="login-password" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500" placeholder="••••••••"><a href="#" class="text-sm text-blue-600 hover:underline mt-2 block text-right">Forgot Password?</a></div>
+                                <button type="submit" class="w-full bg-blue-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-blue-700 transition-colors shadow-lg">Login</button>
+                            </form>
+                        </div>
+
+                        <!-- Register Form -->
+                        <div v-if="activeTab === 'register'">
+                             <form @submit.prevent="handleRegister">
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                                    <div><label for="register-fullname" class="block text-sm font-medium text-gray-700 mb-1">Your Name</label><input v-model="registrationData.name" type="text" id="register-fullname" class="w-full px-4 py-3 border border-gray-300 rounded-lg" placeholder="John Doe"></div>
+                                    <div><label for="register-bizname" class="block text-sm font-medium text-gray-700 mb-1">Business Name</label><input v-model="registrationData.businessName" type="text" id="register-bizname" class="w-full px-4 py-3 border border-gray-300 rounded-lg" placeholder="Your Company Ltd."></div>
+                                </div>
+                                <div class="mb-4"><label for="register-email" class="block text-sm font-medium text-gray-700 mb-1">Email</label><input v-model="registrationData.email" type="email" id="register-email" class="w-full px-4 py-3 border border-gray-300 rounded-lg" placeholder="you@example.com"></div>
+                                <div class="mb-4"><label for="register-password" class="block text-sm font-medium text-gray-700 mb-1">Password</label><input v-model="registrationData.password" type="password" id="register-password" class="w-full px-4 py-3 border border-gray-300 rounded-lg" placeholder="Create a strong password"></div>
+                                <div class="mb-4"><label for="register-address" class="block text-sm font-medium text-gray-700 mb-1">Business Address</label><input type="text" id="register-address" class="w-full px-4 py-3 border border-gray-300 rounded-lg" placeholder="Start typing your address..."></div>
+                                <div class="mb-4"><label for="register-website" class="block text-sm font-medium text-gray-700 mb-1">Website</label><input v-model="registrationData.website" type="url" id="register-website" class="w-full px-4 py-3 border border-gray-300 rounded-lg" placeholder="https://example.com"></div>
+                                <div class="mb-6"><label for="register-objective" class="block text-sm font-medium text-gray-700 mb-1">Business Objective</label><textarea v-model="registrationData.businessObjective" id="register-objective" rows="3" class="w-full px-4 py-3 border border-gray-300 rounded-lg" placeholder="Describe your business..."></textarea></div>
+                                <button type="submit" class="w-full bg-blue-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-blue-700 shadow-lg">Create Account</button>
+                            </form>
+                        </div>
+                        
+                        <div class="mt-8">
+                            <div class="relative"><div class="absolute inset-0 flex items-center"><div class="w-full border-t border-gray-300"></div></div><div class="relative flex justify-center text-sm"><span class="px-2 bg-white text-gray-500">Or continue with</span></div></div>
+                            <div class="mt-6 grid grid-cols-2 gap-3">
+                                <div><a href="#" class="w-full inline-flex justify-center items-center py-3 px-4 border border-gray-300 rounded-lg shadow-sm bg-white text-sm font-medium text-gray-500 hover:bg-gray-50"><GoogleIcon /><span class="ml-2">Google</span></a></div>
+                                <div><a href="#" class="w-full inline-flex justify-center items-center py-3 px-4 border border-gray-300 rounded-lg shadow-sm bg-white text-sm font-medium text-gray-500 hover:bg-gray-50"><FacebookIcon /><span class="ml-2">Facebook</span></a></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `
+        });
+
+        const QuestionnairePage = defineComponent({
+            name: 'QuestionnairePage',
+            emits: ['navigate'],
+            setup(_, { emit }) {
+                const questions = ref(mockQuestions);
+                const currentQuestionIndex = ref(0);
+                const answers = ref({});
+
+                const categoryBreaks = { 'Website Strength': 8, 'Devices & Network': 15, 'Compliance Documentation': 21, 'Cyber Security Implementations': 30 };
+                const totalQuestions = 30; // Using a fixed total for simplicity
+
+                const progress = computed(() => {
+                    const prog = { ws: 0, dn: 0, cd: 0, csi: 0 };
+                    const answeredCount = Object.keys(answers.value).length;
+                    
+                    if (answeredCount <= categoryBreaks['Website Strength']) {
+                        prog.ws = (answeredCount / categoryBreaks['Website Strength']) * 100;
+                    } else if (answeredCount <= categoryBreaks['Devices & Network']) {
+                        prog.ws = 100;
+                        prog.dn = ((answeredCount - categoryBreaks['Website Strength']) / (categoryBreaks['Devices & Network'] - categoryBreaks['Website Strength'])) * 100;
+                    } else if (answeredCount <= categoryBreaks['Compliance Documentation']) {
+                        prog.ws = 100; prog.dn = 100;
+                        prog.cd = ((answeredCount - categoryBreaks['Devices & Network']) / (categoryBreaks['Compliance Documentation'] - categoryBreaks['Devices & Network'])) * 100;
+                    } else {
+                        prog.ws = 100; prog.dn = 100; prog.cd = 100;
+                        prog.csi = ((answeredCount - categoryBreaks['Compliance Documentation']) / (totalQuestions - categoryBreaks['Compliance Documentation'])) * 100;
+                    }
+                    return prog;
+                });
+
+                function nextQuestion() {
+                    if (currentQuestionIndex.value < questions.value.length - 1) {
+                        currentQuestionIndex.value++;
+                    }
+                }
+                function prevQuestion() {
+                    if (currentQuestionIndex.value > 0) {
+                        currentQuestionIndex.value--;
+                    }
+                }
+                function submitAssessment() {
+                    console.log('Submitting answers:', answers.value);
+                    // In a real app, this would make an API call.
+                    // On success, navigate to the dashboard with results.
+                    emit('navigate', 'DashboardPage', { assessmentCompleted: true });
+                }
+
+                return { questions, currentQuestionIndex, answers, progress, nextQuestion, prevQuestion, submitAssessment };
+            },
+            template: `
+                <div class="min-h-screen bg-gray-100 flex flex-col items-center justify-center p-4">
+                    <div class="w-full max-w-2xl">
+                        <!-- Progress Bar -->
+                        <div class="mb-4">
+                            <h3 class="text-sm font-medium text-gray-600 mb-2">Assessment Progress</h3>
+                            <div class="flex rounded-full overflow-hidden h-3 bg-gray-200">
+                                <div class="bg-blue-500 transition-all duration-300" :style="{ width: progress.ws / 4 + '%' }"></div>
+                                <div class="bg-green-500 transition-all duration-300" :style="{ width: progress.dn / 4 + '%' }"></div>
+                                <div class="bg-yellow-500 transition-all duration-300" :style="{ width: progress.cd / 4 + '%' }"></div>
+                                <div class="bg-red-500 transition-all duration-300" :style="{ width: progress.csi / 4 + '%' }"></div>
+                            </div>
+                            <div class="flex justify-between text-xs mt-1 text-gray-500">
+                                <span>Website</span>
+                                <span>Network</span>
+                                <span>Compliance</span>
+                                <span>Security</span>
+                            </div>
+                        </div>
+
+                        <div class="bg-white rounded-2xl shadow-xl p-8">
+                           <div v-if="questions[currentQuestionIndex]">
+                                <p class="text-sm font-bold text-blue-600 mb-2">{{ questions[currentQuestionIndex].category }}</p>
+                                <h2 class="text-2xl font-bold text-gray-800 mb-8">{{ currentQuestionIndex + 1 }}. {{ questions[currentQuestionIndex].text }}</h2>
+                                
+                                <div class="space-y-4">
+                                    <label v-for="(option, index) in questions[currentQuestionIndex].options" :key="index" 
+                                        :class="['flex items-center p-4 border rounded-lg cursor-pointer transition-all', answers[currentQuestionIndex] === option ? 'border-blue-500 bg-blue-50 shadow-md' : 'border-gray-300 hover:border-gray-400']">
+                                        <input type="radio" :name="'q' + currentQuestionIndex" :value="option" v-model="answers[currentQuestionIndex]" class="h-5 w-5 text-blue-600 focus:ring-blue-500">
+                                        <span class="ml-4 text-gray-700">{{ option }}</span>
+                                    </label>
+                                </div>
+                           </div>
+
+                           <!-- Navigation -->
+                           <div class="flex justify-between items-center mt-10">
+                                <button @click="prevQuestion" :disabled="currentQuestionIndex === 0" class="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed">Previous</button>
+                                <p class="text-sm text-gray-500">{{ currentQuestionIndex + 1 }} / {{ questions.length }}</p>
+                                <button v-if="currentQuestionIndex < questions.length - 1" @click="nextQuestion" class="px-6 py-2 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700">Next</button>
+                                <button v-else @click="submitAssessment" class="px-6 py-2 bg-green-600 text-white font-bold rounded-lg hover:bg-green-700">Submit Assessment</button>
+                           </div>
+                        </div>
+                    </div>
+                </div>
+            `
+        });
+
+        const DashboardPage = defineComponent({
+            name: 'DashboardPage',
+            components: { Header, Footer },
+            props: ['isLoggedIn', 'payload'],
+            emits: ['navigate', 'logout'],
+            setup(props) {
+                const assessmentCompleted = computed(() => props.payload?.assessmentCompleted || false);
+                const overallScore = ref(0);
+                const radarChart = ref(null);
+
+                function createRadarChart() {
+                    const ctx = document.getElementById('radarChart');
+                    if (ctx && assessmentCompleted.value) {
+                         // Mock scores after completion
+                        const scores = { ws: 65, dn: 80, cd: 40, csi: 75 };
+                        overallScore.value = Math.round((scores.ws + scores.dn + scores.cd + scores.csi) / 4);
+
+                        new Chart(ctx, {
+                            type: 'radar',
+                            data: {
+                                labels: ['Website Strength', 'Devices & Network', 'Compliance', 'Cyber Security Impl.'],
+                                datasets: [{
+                                    label: 'Your Vulnerability Score',
+                                    data: [scores.ws, scores.dn, scores.cd, scores.csi],
+                                    backgroundColor: 'rgba(59, 130, 246, 0.2)',
+                                    borderColor: 'rgba(59, 130, 246, 1)',
+                                    borderWidth: 2,
+                                    pointBackgroundColor: 'rgba(59, 130, 246, 1)',
+                                }]
+                            },
+                            options: {
+                                scales: { r: { angleLines: { display: false }, suggestedMin: 0, suggestedMax: 100 } },
+                                plugins: { legend: { display: false } }
+                            }
+                        });
+                    }
+                }
+                
+                onMounted(createRadarChart);
+
+                return { assessmentCompleted, overallScore };
+            },
+            template: `
+                <div class="w-full">
+                    <Header :is-logged-in="isLoggedIn" @navigate="$emit('navigate', $event)" @logout="$emit('logout')" />
+                    <main class="bg-gray-100 py-12 px-6">
+                        <div class="container mx-auto">
+                           <h1 class="text-3xl font-bold text-gray-800 mb-8">User Dashboard</h1>
+
+                           <!-- If assessment NOT completed -->
+                           <div v-if="!assessmentCompleted" class="text-center bg-white p-12 rounded-lg shadow-md">
+                               <h2 class="text-2xl font-bold mb-4">Welcome to ITIVA!</h2>
+                               <p class="text-gray-600 mb-8 max-w-lg mx-auto">Your first step to a more secure business starts here. Complete the vulnerability assessment to get your personalized security report and recommendations.</p>
+                               <button @click="$emit('navigate', 'QuestionnairePage')" class="bg-blue-600 text-white font-bold py-3 px-8 rounded-lg text-lg hover:bg-blue-700 transition-transform transform hover:scale-105 shadow-lg">Start Assessment Now</button>
+                           </div>
+
+                           <!-- If assessment IS completed -->
+                           <div v-if="assessmentCompleted" class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                                <!-- Left Column: Score and Chart -->
+                                <div class="lg:col-span-2 bg-white p-8 rounded-lg shadow-md">
+                                    <h2 class="text-2xl font-bold mb-6">Your Vulnerability Assessment Result</h2>
+                                    <div class="max-w-md mx-auto">
+                                        <canvas id="radarChart"></canvas>
+                                    </div>
+                                </div>
+                                <!-- Right Column: Summary and Actions -->
+                                <div class="space-y-8">
+                                    <div class="bg-white p-6 rounded-lg shadow-md text-center">
+                                        <h3 class="text-lg font-medium text-gray-600">Overall Score</h3>
+                                        <p class="text-5xl font-extrabold text-green-600 my-2">{{ overallScore }}</p>
+                                        <p class="text-sm text-gray-500">A higher score indicates a stronger security posture.</p>
+                                    </div>
+                                    <div class="bg-white p-6 rounded-lg shadow-md">
+                                         <h3 class="text-lg font-bold mb-4">Actions</h3>
+                                         <button @click="$emit('navigate', 'QuestionnairePage')" class="w-full text-center mb-4 bg-blue-100 text-blue-700 font-bold py-3 px-4 rounded-lg hover:bg-blue-200 transition-colors">Retake Assessment</button>
+                                         <button class="w-full text-center bg-green-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-green-700 transition-colors">Download PDF Report</button>
+                                    </div>
+                                </div>
+                           </div>
+                        </div>
+                    </main>
+                    <Footer />
+                </div>
+            `
+        });
+        
+        const App = defineComponent({
+            name: 'App',
+            components: { HomePage, LoginPage, AboutUsPage, DashboardPage, QuestionnairePage },
+            setup() {
+                const currentPage = ref('HomePage');
+                const isLoggedIn = ref(false);
+                const pagePayload = ref({}); // To pass data between pages, e.g., results
+
+                function navigateTo(page, payload = {}) {
+                    currentPage.value = page;
+                    pagePayload.value = payload;
+                    window.scrollTo(0, 0);
+                }
+
+                function login() {
+                    isLoggedIn.value = true;
+                    navigateTo('DashboardPage');
+                }
+                
+                function logout() {
+                    isLoggedIn.value = false;
+                    navigateTo('HomePage');
+                }
+                
+                return { currentPage, isLoggedIn, pagePayload, navigateTo, login, logout };
+            },
+            template: `
+                <div>
+                    <transition name="fade" mode="out-in">
+                        <component :is="currentPage" :is-logged-in="isLoggedIn" :payload="pagePayload" @navigate="navigateTo" @login="login" @logout="logout"></component>
+                    </transition>
+                </div>
+            `
+        });
+        
+        createApp(App).mount('#app');
+
+    </script>
+</body>
+</html>
