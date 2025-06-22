@@ -1,0 +1,4 @@
+Features to Add
+Businesses need to Submit their business certificate to prevent any user from creating an account and claiming to be a representative of that business, therefore, generate false info, or an insider within the company looking for exploitations within company's IT infrastructure, or someone with inside info about the company's IT uses the platform to identify weaknesses for attack.
+
+Registration could require user register with business domain name, so that the domain name is used to verify the account as extra security.
