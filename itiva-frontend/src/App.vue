@@ -1,69 +1,62 @@
+<!-- src/App.vue - Updated to manage global header/footer visibility and notification -->
 <script setup>
-import { ref, computed } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
-import Header from './components/Header.vue'
-import Footer from './components/Footer.vue'
+import { computed } from 'vue'
+import { useRoute } from 'vue-router'
+// import { useAuthStore } from './stores/auth' // Import the auth store
+import AppHeader from './components/AppHeader.vue' // Global header component
+import AppFooter from './components/AppFooter.vue' // Global footer component
 
 const route = useRoute()
-const router = useRouter()
 
-// This state would ideally be managed by a state management library like Pinia
-const isLoggedIn = ref(false)
-const isAdmin = ref(false)
+// Reactive state for global notifications
 
-const showHeaderAndFooter = computed(() => route.meta.showHeaderAndFooter !== false)
+/**
+ * Computed property to determine if the global Header and Footer should be shown.
+ * They should be hidden for specific full-page layouts like Login, Assessment, Report, and Admin Dashboard,
+ * as these pages now contain their own headers or full-page content.
+ */
+const showGlobalHeaderAndFooter = computed(() => {
+  // Use the auth store for login state if needed for global header logic
+  // const authStore = useAuthStore()
 
-function login() {
-  isLoggedIn.value = true
-  isAdmin.value = false
-  router.push('/dashboard')
-}
-
-function adminLogin() {
-  isLoggedIn.value = true
-  isAdmin.value = true
-  router.push('/admin/dashboard')
-}
-
-function logout() {
-  isLoggedIn.value = false
-  isAdmin.value = false
-  router.push('/')
-}
-
-// Provide state to all child components
-// provide('auth', { isLoggedIn, isAdmin, login, adminLogin, logout });
+  const noGlobalHeaderRoutes = [
+    'login',
+    'assessment',
+    'dashboard',
+    'questionnaire',
+    'ReportViewerPage',
+    'linkAccounts',
+    'adminDashboard',
+    'adminQuestionnaire', // Assuming this page also handles its own layout
+  ]
+  // Check if the current route name is in the list of routes that hide the global header/footer
+  return !noGlobalHeaderRoutes.includes(route.name)
+})
 </script>
 
 <template>
+  <!-- Main application container, ensures full screen height using flexbox -->
   <div class="flex flex-col min-h-screen">
-    <Header
-      v-if="showHeaderAndFooter"
-      :is-logged-in="isLoggedIn"
-      :is-admin="isAdmin"
-      @logout="logout"
-    />
+    <!-- Global Header: Only shown if showGlobalHeaderAndFooter is true -->
+    <AppHeader v-if="showGlobalHeaderAndFooter" />
+
+    <!-- Main content area: flex-grow ensures it takes available space, pushing footer to bottom -->
     <main class="flex-grow">
-      <router-view
-        :is-logged-in="isLoggedIn"
-        :is-admin="isAdmin"
-        @login="login"
-        @admin-login="adminLogin"
-      />
+      <!-- Vue Router View: Renders the active route component -->
+      <!-- Transition wrapper for smooth page transitions (fade effect) -->
+      <router-view :key="$route.fullPath" v-slot="{ Component }">
+        <transition name="fade" mode="out-in">
+          <component :is="Component" />
+        </transition>
+      </router-view>
     </main>
-    <Footer v-if="showHeaderAndFooter" />
+
+    <!-- Global Footer: Only shown if showGlobalHeaderAndFooter is true -->
+    <AppFooter v-if="showGlobalHeaderAndFooter" />
   </div>
 </template>
 
 <style>
-/* You can move the global styles from the original HTML file's <style> tag to src/assets/main.css */
-.fade-enter-active,
-.fade-leave-active {
-  transition: opacity 0.3s ease;
-}
-
-.fade-enter-from,
-.fade-leave-to {
-  opacity: 0;
-}
+/* Global styles defined in src/assets/main.css are imported via main.js */
+/* No additional scoped styles needed here, as main.css handles app-wide styles */
 </style>

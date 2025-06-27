@@ -1,0 +1,3 @@
+-- database: c:\Users\Dell\Documents\GitHub\IT-Infrastructure-VA\itiva_project\db.sqlite3
+
+ALTER TABLE itiva_app_user DROP full_name;

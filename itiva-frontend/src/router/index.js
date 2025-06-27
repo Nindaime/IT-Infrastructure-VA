@@ -7,6 +7,7 @@ import QuestionnairePage from '@/views/QuestionnairePage.vue'
 import ReportViewerPage from '@/views/ReportViewerPage.vue'
 import AdminDashboardPage from '@/views/admin/AdminDashboardPage.vue'
 import EditQuestionnairePage from '@/views/admin/EditQuestionnairePage.vue'
+import LinkAccountsPage from '@/views/LinkAccountsPage.vue' // New import
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -33,17 +34,18 @@ const router = createRouter({
       path: '/dashboard',
       name: 'dashboard',
       component: DashboardPage,
-      meta: { showHeaderAndFooter: true },
+      // Meta flag to hide global header/footer, as DashboardPage will have its own
+      meta: { showHeaderAndFooter: false },
     },
     {
-      path: '/assessment',
-      name: 'assessment',
+      path: '/questionnaire/:type',
+      name: 'questionnaire',
       component: QuestionnairePage,
       meta: { showHeaderAndFooter: false },
     },
     {
       path: '/report/:businessName?', // Make businessName optional
-      name: 'report',
+      name: 'ReportViewerPage', // Renamed for clarity in route push
       component: ReportViewerPage,
       props: true, // Pass route params as props to the component
       meta: { showHeaderAndFooter: false },
@@ -61,10 +63,17 @@ const router = createRouter({
       component: EditQuestionnairePage,
       meta: { showHeaderAndFooter: false },
     },
+    // New route for linking accounts
+    {
+      path: '/link-accounts',
+      name: 'linkAccounts',
+      component: LinkAccountsPage,
+      meta: { showHeaderAndFooter: false }, // Hide global header/footer for this page
+    },
   ],
   // eslint-disable-next-line no-unused-vars
   scrollBehavior(to, from, savedPosition) {
-    // always scroll to top
+    // Always scroll to top
     return { top: 0 }
   },
 })

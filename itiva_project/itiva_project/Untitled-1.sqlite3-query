@@ -1,0 +1,5 @@
+-- database: c:\Users\Dell\Documents\GitHub\IT-Infrastructure-VA\itiva_project\db.sqlite3
+
+-- SELECT * FROM itiva_app_user;
+
+-- drop the full_name, add the 

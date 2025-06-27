@@ -1,239 +1,534 @@
-<!-- src/views/HomePage.vue -->
+<!-- src/views/HomePage.vue - Major rebuild based on new layout and grading requirements -->
 <script setup>
-import { ref, computed } from 'vue';
-import { useRouter } from 'vue-router';
-import { mockRankings } from '@/api/mockData';
+import { ref, computed } from 'vue'
+import { useAuthStore } from '@/stores/auth' // Import the auth store
+import { useAssessmentStore } from '@/stores/assessment' // Import the assessment store
+import { useRouter } from 'vue-router'
+import { mockRankings } from '@/api/mockData' // Assuming mockRankings is structured as per previous definition
 
-// Initialize the router for navigation
-const router = useRouter();
+// Initialize the router for programmatic navigation
+const router = useRouter()
 
-// Reactive reference for the list of rankings
-const rankings = ref(mockRankings);
+// Reactive reference for the list of mock rankings
+// Limiting to 10 companies as requested
+const rankings = ref(mockRankings.slice(0, 10))
 
-// Reactive reference for the filter criterion ('ranking', 'location', or 'type')
-const rankingFilter = ref('ranking');
-
-// Reactive reference for the currently selected ranking item, initialized to the first item
-const selectedRanking = ref(rankings.value[0]);
-
+// --- Grading Logic ---
 /**
- * Computed property to group rankings based on the selected filter.
- * If 'ranking' is selected, it returns the top 20 sorted by rank.
- * Otherwise, it groups by the specified key (location or type).
- * @returns {object} An object where keys are group names and values are arrays of ranking items.
+ * Calculates the grade based on a given score.
+ * @param {number} score The numerical score.
+ * @returns {string} The corresponding letter grade.
  */
-const groupedRankings = computed(() => {
-    if (rankingFilter.value === 'ranking') {
-        // Return top 20 rankings sorted by rank
-        return { 'Top 20 Rankings': rankings.value.slice().sort((a, b) => a.rank - b.rank) };
-    }
-    // Group rankings by the selected filter key (location or type)
-    const grouped = rankings.value.reduce((acc, rank) => {
-        const key = rank[rankingFilter.value];
-        if (!acc[key]) acc[key] = []; // Initialize array for new group if it doesn't exist
-        acc[key].push(rank); // Add the current ranking item to its group
-        return acc;
-    }, {});
-    // Sort the grouped object by keys alphabetically and return
-    return Object.fromEntries(Object.entries(grouped).sort());
-});
-
-/**
- * Selects a ranking item to display its detailed report.
- * @param {object} item The ranking item to select.
- */
-function selectRanking(item) {
-    selectedRanking.value = item;
+function getGrade(score) {
+  if (score >= 85) return 'A'
+  if (score >= 75) return 'B'
+  if (score >= 65) return 'C'
+  if (score >= 50) return 'D'
+  return 'E'
 }
 
 /**
- * Navigates the user to the login page.
+ * Determines the Tailwind CSS text color class based on the grade.
+ * As requested, ensuring distinct colors:
+ * A: Green (safe)
+ * B: Emerald (subtle green, distinct from A)
+ * C: Yellow (neutral warning)
+ * D: Orange (minor concern)
+ * E: Red (danger)
+ * @param {string} grade The letter grade (A, B, C, D, E).
+ * @returns {string} The Tailwind CSS class for text color.
+ */
+function getGradeColorClass(grade) {
+  switch (grade) {
+    case 'A':
+      return 'text-green-600' // Safe Green
+    case 'B':
+      return 'text-emerald-600' // Emerald (slightly darker green/teal)
+    case 'C':
+      return 'text-yellow-600' // Yellow
+    case 'D':
+      return 'text-orange-600' // Orange
+    case 'E':
+      return 'text-red-600' // Danger Red
+    default:
+      return 'text-gray-600' // Fallback
+  }
+}
+
+// --- Grouped Rankings for 3-column layout ---
+const rankingsByRating = computed(() => {
+  // Sort by overall score (descending) as it correlates with 'Rating'
+  return rankings.value.slice().sort((a, b) => b.score - a.score)
+})
+
+const rankingsByLocation = computed(() => {
+  const grouped = rankings.value.reduce((acc, rank) => {
+    const key = rank.location
+    if (!acc[key]) acc[key] = []
+    acc[key].push(rank)
+    return acc
+  }, {})
+  // Sort locations alphabetically, then by score within each location
+  return Object.fromEntries(
+    Object.entries(grouped)
+      .sort()
+      .map(([key, value]) => [key, value.sort((a, b) => b.score - a.score)]),
+  )
+})
+
+const rankingsByType = computed(() => {
+  const grouped = rankings.value.reduce((acc, rank) => {
+    const key = rank.type
+    if (!acc[key]) acc[key] = []
+    acc[key].push(rank)
+    return acc
+  }, {})
+  // Sort types alphabetically, then by score within each type
+  return Object.fromEntries(
+    Object.entries(grouped)
+      .sort()
+      .map(([key, value]) => [key, value.sort((a, b) => b.score - a.score)]),
+  )
+})
+
+// Initialize the auth store
+const authStore = useAuthStore()
+const assessmentStore = useAssessmentStore()
+
+/**
+ * Navigates the user to the login page to start an assessment.
  */
 function navigateToLogin() {
-    router.push('/login');
-}
-
-/**
- * Navigates the user to the report viewer page with the selected business's report.
- * @param {object} biz The business object whose report is to be viewed.
- */
-function viewReport(biz) {
-    // Navigate to the ReportViewerPage, passing the business report as payload
-    router.push({ name: 'ReportViewerPage', params: { report: JSON.stringify(biz.report), name: biz.name } });
+  router.push('/login')
 }
 </script>
 
 <template>
-    <div class="font-sans">
-        <!-- Hero Section -->
-        <div class="bg-gradient-to-r from-blue-600 to-indigo-700 text-white py-20 md:py-32 shadow-xl">
-            <div class="container mx-auto px-6 text-center">
-                <h1 class="text-4xl md:text-6xl font-extrabold leading-tight mb-6">
-                    Assess Your IT Vulnerabilities with <span class="text-yellow-300">AI-Powered</span> Precision
-                </h1>
-                <p class="text-lg md:text-xl max-w-3xl mx-auto mb-10 opacity-90">
-                    ITIVA (IT Infrastructure Vulnerability Assessment) is an intelligent platform that helps businesses in the UK identify, analyze, and mitigate security risks across their digital infrastructure.
-                </p>
-                <button @click="navigateToLogin" class="bg-white text-blue-700 font-bold py-4 px-10 rounded-full text-lg hover:bg-gray-100 transition-transform transform hover:scale-105 shadow-2xl">
-                    Start Your Free Assessment
-                </button>
-            </div>
+  <div class="font-sans">
+    <!-- Hero Section: Grand, eye-catching introduction with gradient background and shadow -->
+    <div class="bg-gradient-to-r from-blue-600 to-indigo-700 text-white py-20 md:py-22 shadow-xl">
+      <div class="container mx-auto px-6 text-center">
+        <!-- Main Heading: Large, bold, responsive text with yellow highlight for "AI-Powered" -->
+        <h1 class="text-4xl md:text-6xl font-extrabold leading-tight mb-6">
+          Assess Your IT Vulnerabilities with
+          <span class="text-yellow-300">AI-Powered</span> Precision
+        </h1>
+        <!-- Sub-heading/Description: Readable text, centered, with slight opacity -->
+        <p class="text-lg md:text-xl max-w-3xl mx-auto mb-10 opacity-90">
+          ITIVA (IT Infrastructure Vulnerability Assessment) is an intelligent platform that helps
+          businesses in the UK identify, analyze, and mitigate security risks across their digital
+          infrastructure.
+        </p>
+        <!-- Call to Action Button: Prominent, white background, blue text, interactive hover effects -->
+        <button
+          @click="navigateToLogin"
+          class="bg-white text-blue-700 cursor-pointer font-bold py-4 px-10 rounded-full text-lg hover:bg-gray-100 transition-transform transform hover:scale-105 shadow-2xl"
+        >
+          Start Your Free Assessment
+        </button>
+      </div>
+    </div>
+
+    <section id="rankings" class="py-20 bg-gray-50/70">
+      <div class="container mx-auto px-6">
+        <div class="text-center mb-12">
+          <h2 class="text-3xl md:text-4xl font-bold text-gray-800">UK's Most Secure Businesses</h2>
+          <p class="text-gray-600 mt-4 max-w-2xl mx-auto mb-8">
+            Discover the top-ranked businesses based on their comprehensive ITIVA vulnerability
+            score, grouped by various criteria.
+          </p>
+          <!-- Removed "Group by:" and filter buttons as per new requirements -->
         </div>
 
-        <!-- UK's Most Secure Businesses Section -->
-        <section id="rankings" class="py-20 bg-gray-50/70">
-            <div class="container mx-auto px-6">
-                <div class="text-center mb-12">
-                    <h2 class="text-3xl md:text-4xl font-bold text-gray-800">UK's Most Secure Businesses</h2>
-                    <p class="text-gray-600 mt-4 max-w-2xl mx-auto">Discover the top-ranked businesses based on their comprehensive ITIVA vulnerability score.</p>
-                    <div class="mt-8 flex justify-center items-center flex-wrap gap-3">
-                        <span class="text-gray-700 font-medium text-lg">Group by:</span>
-                        <button @click="rankingFilter = 'ranking'"
-                            :class="['px-6 py-2 rounded-full font-semibold transition-all duration-300',
-                            rankingFilter === 'ranking' ? 'bg-blue-600 text-white shadow-lg' : 'bg-white text-gray-700 hover:bg-blue-50 hover:text-blue-700 border border-gray-300']">
-                            Ranking
-                        </button>
-                        <button @click="rankingFilter = 'location'"
-                            :class="['px-6 py-2 rounded-full font-semibold transition-all duration-300',
-                            rankingFilter === 'location' ? 'bg-blue-600 text-white shadow-lg' : 'bg-white text-gray-700 hover:bg-blue-50 hover:text-blue-700 border border-gray-300']">
-                            Location
-                        </button>
-                        <button @click="rankingFilter = 'type'"
-                            :class="['px-6 py-2 rounded-full font-semibold transition-all duration-300',
-                            rankingFilter === 'type' ? 'bg-blue-600 text-white shadow-lg' : 'bg-white text-gray-700 hover:bg-blue-50 hover:text-blue-700 border border-gray-300']">
-                            Business Type
-                        </button>
-                    </div>
-                </div>
-
-                <div class="bg-white rounded-2xl shadow-xl flex flex-col md:flex-row min-h-[600px] overflow-hidden">
-                    <!-- Rankings List Sidebar -->
-                    <div class="w-full md:w-2/5 border-b md:border-b-0 md:border-r border-gray-200 flex flex-col">
-                        <div class="p-6 border-b border-gray-200">
-                            <h3 class="text-xl font-bold text-gray-800">Business Rankings</h3>
-                        </div>
-                        <div class="overflow-y-auto custom-scrollbar flex-grow p-4">
-                            <div v-for="(group, groupName) in groupedRankings" :key="groupName" class="mb-4 last:mb-0">
-                                <h4 class="font-semibold text-sm text-blue-800 bg-blue-50 px-4 py-2 rounded-md mb-2 sticky top-0 z-10 shadow-sm">{{ groupName }}</h4>
-                                <ul class="space-y-1">
-                                    <li v-for="item in group" :key="item.rank" @click="selectRanking(item)"
-                                        class="p-3 rounded-lg cursor-pointer flex items-center justify-between transition-all duration-200"
-                                        :class="selectedRanking && selectedRanking.rank === item.rank ? 'bg-blue-100 shadow-sm border border-blue-200' : 'hover:bg-gray-50'">
-                                        <div class="flex items-center truncate">
-                                            <span class="font-bold text-gray-400 mr-3 w-6 text-center flex-shrink-0">{{ item.rank }}</span>
-                                            <div class="truncate">
-                                                <p class="font-bold text-gray-800 text-sm truncate">{{ item.name }}</p>
-                                                <p class="text-xs text-gray-500 truncate">{{ item.location }} - {{ item.type }}</p>
-                                            </div>
-                                        </div>
-                                        <span class="font-extrabold text-base flex-shrink-0 ml-2"
-                                            :class="item.score > 75 ? 'text-green-600' : item.score > 50 ? 'text-yellow-600' : 'text-red-600'">
-                                            {{ item.score }}
-                                        </span>
-                                    </li>
-                                </ul>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Selected Business Report Summary -->
-                    <div class="w-full md:w-3/5 p-8 flex flex-col justify-center bg-gray-50 rounded-r-2xl">
-                        <div v-if="selectedRanking" class="text-center md:text-left">
-                            <h2 class="text-4xl font-bold text-gray-800 mb-2">{{ selectedRanking.name }}</h2>
-                            <p class="text-lg text-gray-500 mb-8">{{ selectedRanking.location }} - {{ selectedRanking.type }}</p>
-
-                            <div class="flex flex-col items-center md:items-start mb-10">
-                                <p class="text-sm text-gray-600 mb-2">Overall Security Score</p>
-                                <p class="text-7xl font-extrabold mb-4"
-                                    :class="selectedRanking.score > 75 ? 'text-green-600' : selectedRanking.score > 50 ? 'text-yellow-600' : 'text-red-600'">
-                                    {{ selectedRanking.score }}
-                                </p>
-                                <button @click="viewReport(selectedRanking)"
-                                    class="bg-blue-600 text-white font-semibold py-3 px-8 rounded-full text-md hover:bg-blue-700 transition-transform transform hover:scale-105 shadow-md">
-                                    View Full Report
-                                </button>
-                            </div>
-
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 text-left">
-                                <div class="flex items-center p-4 bg-white rounded-lg shadow-sm border border-gray-200">
-                                    <svg class="w-8 h-8 text-blue-500 mr-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h4l-1-1v-3.25m-6.096 1.408l-3.003-3.004C2.012 10.612 0 8.874 0 7c0-1.79 1.41-3.266 3-3.896c1.59-.63 3.23-1.004 4.5-.604c1.27.4 2.378 1.547 3 2.896M21 7c0 1.79-1.41 3.266-3 3.896c-1.59.63-3.23 1.004-4.5.604c-1.27-.4-2.378-1.547-3-2.896"></path></svg>
-                                    <div>
-                                        <p class="text-sm text-gray-600">Website Strength</p>
-                                        <p class="text-xl font-bold" :class="selectedRanking.report.ws > 75 ? 'text-green-600' : selectedRanking.report.ws > 50 ? 'text-yellow-600' : 'text-red-600'">
-                                            {{ selectedRanking.report.ws }}%
-                                        </p>
-                                    </div>
-                                </div>
-                                <div class="flex items-center p-4 bg-white rounded-lg shadow-sm border border-gray-200">
-                                    <svg class="w-8 h-8 text-blue-500 mr-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0zM10 7v5h4"></path></svg>
-                                    <div>
-                                        <p class="text-sm text-gray-600">Devices & Network</p>
-                                        <p class="text-xl font-bold" :class="selectedRanking.report.dn > 75 ? 'text-green-600' : selectedRanking.report.dn > 50 ? 'text-yellow-600' : 'text-red-600'">
-                                            {{ selectedRanking.report.dn }}%
-                                        </p>
-                                    </div>
-                                </div>
-                                <div class="flex items-center p-4 bg-white rounded-lg shadow-sm border border-gray-200">
-                                    <svg class="w-8 h-8 text-blue-500 mr-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
-                                    <div>
-                                        <p class="text-sm text-gray-600">Compliance & Documentation</p>
-                                        <p class="text-xl font-bold" :class="selectedRanking.report.cd > 75 ? 'text-green-600' : selectedRanking.report.cd > 50 ? 'text-yellow-600' : 'text-red-600'">
-                                            {{ selectedRanking.report.cd }}%
-                                        </p>
-                                    </div>
-                                </div>
-                                <div class="flex items-center p-4 bg-white rounded-lg shadow-sm border border-gray-200">
-                                    <svg class="w-8 h-8 text-blue-500 mr-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c1.657 0 3 1.343 3 3v2a3 3 0 01-3 3m0-12c1.657 0 3 1.343 3 3v2a3 3 0 01-3 3m0-12a9 9 0 100 18A9 9 0 0012 8z"></path></svg>
-                                    <div>
-                                        <p class="text-sm text-gray-600">Cyber Security Implementations</p>
-                                        <p class="text-xl font-bold" :class="selectedRanking.report.cs > 75 ? 'text-green-600' : selectedRanking.report.cs > 50 ? 'text-yellow-600' : 'text-red-600'">
-                                            {{ selectedRanking.report.cs }}%
-                                        </p>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <div v-else class="text-center text-gray-500">
-                            <p class="text-lg">Select a business from the list to view its security summary.</p>
-                            <svg class="mx-auto mt-8 w-24 h-24 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 17v-4m0 0l-3-3m3 3h4m0 0l3-3m-3 3v4m0 0H9m0-10h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
-                        </div>
-                    </div>
-                </div>
+        <!-- Three-Column Ranking Display Area: Grid layout for distinct ranking views -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          <!-- Column 1: Business Ranking by Rating -->
+          <div
+            class="bg-white rounded-2xl shadow-xl flex flex-col overflow-hidden border border-gray-200"
+          >
+            <div class="p-6 border-b border-gray-200 bg-blue-50">
+              <h3 class="text-xl font-bold text-blue-800">Business Ranking by Rating</h3>
             </div>
-        </section>
-
-        <!-- Placeholder for About Us Section -->
-        <section id="about" class="py-20 bg-white">
-            <div class="container mx-auto px-6 text-center">
-                <h2 class="text-3xl md:text-4xl font-bold text-gray-800 mb-4">About ITIVA</h2>
-                <p class="text-lg text-gray-600 max-w-3xl mx-auto">
-                    ITIVA is committed to empowering businesses with the knowledge and tools to secure their digital presence. Our cutting-edge AI technology provides in-depth vulnerability assessments, helping you proactively manage and mitigate risks. Learn more about our mission and values.
-                </p>
-                <button @click="router.push('/about')" class="mt-8 bg-blue-500 text-white font-bold py-3 px-8 rounded-full hover:bg-blue-600 transition-transform transform hover:scale-105 shadow-md">
-                    Learn More
-                </button>
+            <div class="overflow-y-auto custom-scrollbar flex-grow p-4 min-h-[400px]">
+              <ul class="space-y-1">
+                <li
+                  v-for="item in rankingsByRating"
+                  :key="item.rank"
+                  class="p-3 rounded-lg flex items-center justify-between"
+                >
+                  <div class="flex items-center truncate">
+                    <span class="font-bold text-gray-400 mr-3 w-6 text-center flex-shrink-0">{{
+                      item.rank
+                    }}</span>
+                    <div class="truncate">
+                      <!-- Increased font size for company name as requested -->
+                      <p class="font-bold text-gray-800 text-base truncate">{{ item.name }}</p>
+                      <p class="text-xs text-gray-500 truncate">
+                        {{ item.location }} - {{ item.type }}
+                      </p>
+                    </div>
+                  </div>
+                  <!-- Grade display with conditional color -->
+                  <span
+                    class="font-extrabold text-base flex-shrink-0 ml-2"
+                    :class="getGradeColorClass(getGrade(item.score))"
+                  >
+                    {{ getGrade(item.score) }}
+                  </span>
+                </li>
+              </ul>
             </div>
-        </section>
-    </div>
+          </div>
+
+          <!-- Column 2: Business Ranking by Location -->
+          <div
+            class="bg-white rounded-2xl shadow-xl flex flex-col overflow-hidden border border-gray-200"
+          >
+            <div class="p-6 border-b border-gray-200 bg-green-50">
+              <h3 class="text-xl font-bold text-green-800">Business Ranking by Location</h3>
+            </div>
+            <div class="overflow-y-auto custom-scrollbar flex-grow p-4 min-h-[400px]">
+              <div
+                v-for="(group, groupName) in rankingsByLocation"
+                :key="groupName"
+                class="mb-1 last:mb-0"
+              >
+                <h4
+                  class="font-semibold text-sm text-green-800 bg-green-100 px-4 py-2 rounded-md mb-1 sticky top-0 z-10 shadow-sm"
+                >
+                  {{ groupName }}
+                </h4>
+                <ul class="space-y-1">
+                  <li
+                    v-for="item in group"
+                    :key="item.rank"
+                    class="p-1 rounded-lg flex items-center justify-between"
+                  >
+                    <div class="flex items-center truncate">
+                      <span class="font-bold text-gray-400 mr-3 w-6 text-center flex-shrink-0">{{
+                        item.rank
+                      }}</span>
+                      <div class="truncate">
+                        <!-- Increased font size for company name as requested -->
+                        <p class="font-bold text-gray-800 text-base truncate">{{ item.name }}</p>
+                        <p class="text-xs text-gray-500 truncate">
+                          {{ item.location }} - {{ item.type }}
+                        </p>
+                      </div>
+                    </div>
+                    <!-- Grade display with conditional color -->
+                    <span
+                      class="font-extrabold text-base flex-shrink-0 ml-2"
+                      :class="getGradeColorClass(getGrade(item.score))"
+                    >
+                      {{ getGrade(item.score) }}
+                    </span>
+                  </li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
+          <!-- Column 3: Business Ranking by Type -->
+          <div
+            class="bg-white rounded-2xl shadow-xl flex flex-col overflow-hidden border border-gray-200"
+          >
+            <div class="p-6 border-b border-gray-200 bg-purple-50">
+              <h3 class="text-xl font-bold text-purple-800">Business Ranking by Type</h3>
+            </div>
+            <div class="overflow-y-auto custom-scrollbar flex-grow p-4 min-h-[400px]">
+              <div
+                v-for="(group, groupName) in rankingsByType"
+                :key="groupName"
+                class="mb-1 last:mb-0"
+              >
+                <h4
+                  class="font-semibold text-sm text-purple-800 bg-purple-100 px-4 py-2 rounded-md mb-1 sticky top-0 z-10 shadow-sm"
+                >
+                  {{ groupName }}
+                </h4>
+                <ul class="space-y-1">
+                  <li
+                    v-for="item in group"
+                    :key="item.rank"
+                    class="p-1 rounded-lg flex items-center justify-between"
+                  >
+                    <div class="flex items-center truncate">
+                      <span class="font-bold text-gray-400 mr-3 w-6 text-center flex-shrink-0">{{
+                        item.rank
+                      }}</span>
+                      <div class="truncate">
+                        <!-- Increased font size for company name as requested -->
+                        <p class="font-bold text-gray-800 text-base truncate">{{ item.name }}</p>
+                        <p class="text-xs text-gray-500 truncate">
+                          {{ item.location }} - {{ item.type }}
+                        </p>
+                      </div>
+                    </div>
+                    <!-- Grade display with conditional color -->
+                    <span
+                      class="font-extrabold text-base flex-shrink-0 ml-2"
+                      :class="getGradeColorClass(getGrade(item.score))"
+                    >
+                      {{ getGrade(item.score) }}
+                    </span>
+                  </li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- How It Works Section - Reintroduced and updated content -->
+    <section id="how-it-works" class="py-20 bg-white">
+      <div class="container mx-auto px-6">
+        <h2 class="text-3xl md:text-4xl font-bold text-gray-800 text-center mb-12">How It Works</h2>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+          <!-- Step 1: Register & Answer -->
+          <div class="bg-white p-8 rounded-xl shadow-lg text-center border border-gray-200">
+            <div
+              class="w-16 h-16 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-6 text-3xl font-bold"
+            >
+              1
+            </div>
+            <h3 class="text-2xl font-semibold text-gray-800 mb-4">Register & Answer</h3>
+            <p class="text-gray-600 leading-relaxed">
+              Create your business profile and complete our straightforward, up to date 40-questions
+              Net Triad assessments. We also offer specialized questionnaires for Advanced Cloud
+              Security and GDPR Compliance.
+            </p>
+          </div>
+          <!-- Step 2: AI-Powered Analysis -->
+          <div class="bg-white p-8 rounded-xl shadow-lg text-center border border-gray-200">
+            <div
+              class="w-16 h-16 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-6 text-3xl font-bold"
+            >
+              2
+            </div>
+            <h3 class="text-2xl font-semibold text-gray-800 mb-4">AI-Powered Analysis</h3>
+            <p class="text-gray-600 leading-relaxed">
+              Our system analyzes your answers based on 4 main criteria: Website Security, Device &
+              Network, Compliance Documentation & Cybersecurity Implementation to calculate your
+              vulnerability score for each category.
+            </p>
+          </div>
+          <!-- Step 3: Get Actionable Insights -->
+          <div class="bg-white p-8 rounded-xl shadow-lg text-center border border-gray-200">
+            <div
+              class="w-16 h-16 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-6 text-3xl font-bold"
+            >
+              3
+            </div>
+            <h3 class="text-2xl font-semibold text-gray-800 mb-4">Get Actionable Insights</h3>
+            <p class="text-gray-600 leading-relaxed">
+              Receive an instant, detailed report with a visual Radar Chart and prioritized
+              recommendations. You may download your reports as pdf for further review or reach to
+              us on actionable plans to mitigate your security gaps.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Platform Features Section - Reintroduced -->
+    <section id="features" class="py-20 bg-gray-50/70">
+      <div class="container mx-auto px-6">
+        <h2 class="text-3xl md:text-4xl font-bold text-gray-800 text-center mb-12">
+          Platform Features
+        </h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
+          <!-- Feature 1: Comprehensive Assessments -->
+          <div class="flex items-start bg-gray-50 p-6 rounded-lg shadow-sm border border-gray-100">
+            <div
+              class="flex-shrink-0 w-12 h-12 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mr-4"
+            >
+              <svg
+                class="w-6 h-6"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 20.944a11.955 11.955 0 0118 0 12.02 12.02 0 00-3.382-9.984z"
+                ></path>
+              </svg>
+            </div>
+            <div>
+              <h3 class="text-xl font-semibold text-gray-800 mb-2">Comprehensive Assessments</h3>
+              <p class="text-gray-600">
+                Detailed analysis of your IT infrastructure covering a wide range of potential
+                vulnerabilities.
+              </p>
+            </div>
+          </div>
+          <!-- Feature 2: Risk Prioritization -->
+          <div class="flex items-start bg-gray-50 p-6 rounded-lg shadow-sm border border-gray-100">
+            <div
+              class="flex-shrink-0 w-12 h-12 bg-green-100 text-green-600 rounded-full flex items-center justify-center mr-4"
+            >
+              <svg
+                class="w-6 h-6"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M13 10V3L4 14h7v7l9-11h-7z"
+                ></path>
+              </svg>
+            </div>
+            <div>
+              <h3 class="text-xl font-semibold text-gray-800 mb-2">Risk Prioritization</h3>
+              <p class="text-gray-600">
+                Automatically identify and prioritize the most critical risks, enabling efficient
+                resource allocation.
+              </p>
+            </div>
+          </div>
+          <!-- Feature 3: Automated Reporting -->
+          <div class="flex items-start bg-gray-50 p-6 rounded-lg shadow-sm border border-gray-100">
+            <div
+              class="flex-shrink-0 w-12 h-12 bg-purple-100 text-purple-600 rounded-full flex items-center justify-center mr-4"
+            >
+              <svg
+                class="w-6 h-6"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"
+                ></path>
+              </svg>
+            </div>
+            <div>
+              <h3 class="text-xl font-semibold text-gray-800 mb-2">Automated Reporting</h3>
+              <p class="text-gray-600">
+                Generate clear, actionable reports instantly, detailing vulnerabilities and
+                recommended solutions.
+              </p>
+            </div>
+          </div>
+          <!-- Feature 4: User-Friendly Dashboard -->
+          <div class="flex items-start bg-gray-50 p-6 rounded-lg shadow-sm border border-gray-100">
+            <div
+              class="flex-shrink-0 w-12 h-12 bg-yellow-100 text-yellow-600 rounded-full flex items-center justify-center mr-4"
+            >
+              <svg
+                class="w-6 h-6"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V7a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                ></path>
+              </svg>
+            </div>
+            <div>
+              <h3 class="text-xl font-semibold text-gray-800 mb-2">User-Friendly Dashboard</h3>
+              <p class="text-gray-600">
+                Intuitive dashboard to monitor your security posture and track progress over time.
+              </p>
+            </div>
+          </div>
+          <!-- Feature 5: Scalable Solutions -->
+          <div class="flex items-start bg-gray-50 p-6 rounded-lg shadow-sm border border-gray-100">
+            <div
+              class="flex-shrink-0 w-12 h-12 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center mr-4"
+            >
+              <svg
+                class="w-6 h-6"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5s3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18s-3.332.477-4.5 1.253"
+                ></path>
+              </svg>
+            </div>
+            <div>
+              <h3 class="text-xl font-semibold text-gray-800 mb-2">Scalable Solutions</h3>
+              <p class="text-gray-600">
+                Whether you're a small business or a large enterprise, ITIVA scales to meet your
+                security needs.
+              </p>
+            </div>
+          </div>
+          <!-- Feature 6: Expert Support -->
+          <div class="flex items-start bg-gray-50 p-6 rounded-lg shadow-sm border border-gray-100">
+            <div
+              class="flex-shrink-0 w-12 h-12 bg-pink-100 text-pink-600 rounded-full flex items-center justify-center mr-4"
+            >
+              <svg
+                class="w-6 h-6"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"
+                ></path>
+              </svg>
+            </div>
+            <div>
+              <h3 class="text-xl font-semibold text-gray-800 mb-2">Expert Support</h3>
+              <p class="text-gray-600">
+                Access to our team of cybersecurity experts for guidance and advanced threat
+                mitigation.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- UK's Most Secure Businesses Section - Modified for 3-column layout -->
+
+    <!-- About Us Section Placeholder: Calls to action to learn more -->
+    <section id="about" class="py-20 bg-white">
+      <div class="container mx-auto px-6 text-center">
+        <h2 class="text-3xl md:text-4xl font-bold text-gray-800 mb-4">About ITIVA</h2>
+        <p class="text-lg text-gray-600 max-w-3xl mx-auto">
+          ITIVA is committed to empowering businesses with the knowledge and tools to secure their
+          digital presence. Our cutting-edge AI technology provides in-depth vulnerability
+          assessments, helping you proactively manage and mitigate risks. Learn more about our
+          mission and values.
+        </p>
+        <button
+          @click="router.push('/about')"
+          class="mt-8 bg-blue-600 text-white font-bold py-3 px-8 rounded-full hover:bg-blue-700 transition-transform transform hover:scale-105 shadow-md"
+        >
+          Learn More
+        </button>
+      </div>
+    </section>
+  </div>
 </template>
-
-<style scoped>
-/* Custom scrollbar for better aesthetics */
-.custom-scrollbar::-webkit-scrollbar {
-    width: 8px;
-}
-
-.custom-scrollbar::-webkit-scrollbar-track {
-    background: #f0f0f0; /* Light gray track */
-    border-radius: 4px;
-}
-
-.custom-scrollbar::-webkit-scrollbar-thumb {
-    background: #a0a0a0; /* Darker gray thumb */
-    border-radius: 4px;
-}
-
-.custom-scrollbar::-webkit-scrollbar-thumb:hover {
-    background: #888; /* Even darker on hover */
-}
-</style>

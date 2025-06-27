@@ -1,41 +1,48 @@
-<!-- src/views/AdminDashboardPage.vue -->
+<!-- src/views/admin/AdminDashboardPage.vue - Updated as per requirements -->
 <script setup>
 import { ref, computed } from 'vue'
-import { useRouter } from 'vue-router'
-import { mockRankings, mockQuestions } from '@/api/mockData' // Assuming these are still used for admin context
+import { useAuthStore } from '@/stores/auth' // Import the auth store
+import { useRouter, RouterLink } from 'vue-router' // Import RouterLink for navigation
+import { mockRankings, fullQuestionnaireData } from '@/api/mockData' // Using mock data
 
 // Initialize the router for navigation
 const router = useRouter()
 
-// Props received from the parent component (e.g., App.vue)
-const props = defineProps({
-  isLoggedIn: Boolean,
-  isAdmin: Boolean,
-})
-
-// Reactive state for showing/hiding the welcome modal
-const showWelcomeModal = ref(true)
-
-// Mock data for admin dashboard
+// Mock data for admin dashboard overview
 const totalUsers = ref(150)
 const activeAssessments = ref(25)
+
+// Initialize the auth store
+const authStore = useAuthStore()
 const pendingApprovals = ref(5)
 
 // Mock list of all businesses/clients (could be fetched from backend)
 const businesses = ref(
   mockRankings.map((r) => ({
     ...r,
-    id: r.rank,
+    id: r.rank, // Ensure unique ID for iteration
     status: r.score > 70 ? 'Active' : 'Needs Attention',
+    // Add category scores directly from report for progress bars
+    categoryScores: r.report
+      ? [
+          { name: 'Website Strength', score: r.report.ws, key: 'ws' },
+          { name: 'Devices & Network', score: r.report.dn, key: 'dn' },
+          { name: 'Compliance & Documentation', score: r.report.cd, key: 'cd' },
+          { name: 'Cyber Security Implementations', score: r.report.cs, key: 'cs' },
+        ]
+      : [],
   })),
 )
+
+// Reactive state for selected business to show category scores on the right side
+const selectedBusinessForScores = ref(businesses.value.length > 0 ? businesses.value[0] : null)
 
 // Mock list of questionnaires (editable by admin)
 const questionnaires = ref([
   {
     id: 1,
     name: 'Standard ITIVA Assessment',
-    questionsCount: mockQuestions.length,
+    questionsCount: fullQuestionnaireData.length,
     lastUpdated: '2024-05-01',
     status: 'Active',
   },
@@ -55,12 +62,12 @@ const questionnaires = ref([
   },
 ])
 
-// Reactive state for search and sort
+// Reactive state for search and sort for business list
 const searchTerm = ref('')
-const sortKey = ref('name') // 'name', 'location', 'type', 'score'
-const sortOrder = ref(1) // 1 for ascending, -1 for descending
+const sortKey = ref('score') // Default sort key is 'score'
+const sortOrder = ref(0) // 0 for descending, 1 for ascending
 
-// Computed property for filtered and sorted businesses
+// Computed property for filtered and sorted businesses in the list
 const filteredAndSortedBusinesses = computed(() => {
   let filtered = businesses.value
 
@@ -79,13 +86,10 @@ const filteredAndSortedBusinesses = computed(() => {
   return filtered.sort((a, b) => {
     let valA = a[sortKey.value]
     let valB = b[sortKey.value]
-
-    // Handle string comparison
     if (typeof valA === 'string' && typeof valB === 'string') {
-      return valA.localeCompare(valB) * sortOrder.value
+      return valA.localeCompare(valB) * (sortOrder.value === 0 ? -1 : 1)
     }
-    // Handle numeric comparison
-    return (valA - valB) * sortOrder.value
+    return (valA - valB) * (sortOrder.value === 0 ? -1 : 1)
   })
 })
 
@@ -95,22 +99,19 @@ const filteredAndSortedBusinesses = computed(() => {
  */
 function toggleSort(key) {
   if (sortKey.value === key) {
-    sortOrder.value *= -1 // Reverse order if same key clicked again
+    sortOrder.value = sortOrder.value === 0 ? 1 : 0 // Toggle between 0 and 1
   } else {
-    sortKey.value = key // Set new sort key
-    sortOrder.value = 1 // Default to ascending for new key
+    sortKey.value = key
+    sortOrder.value = 0 // Default to descending for new key
   }
 }
 
 /**
- * Navigates to the report viewer page for a specific business.
- * @param {object} biz The business object whose report is to be viewed.
+ * Sets the selected business for displaying category scores.
+ * @param {object} biz The business object to select.
  */
-function viewReport(biz) {
-  router.push({
-    name: 'ReportViewerPage',
-    params: { report: JSON.stringify(biz.report), name: biz.name },
-  })
+function selectBusinessForScores(biz) {
+  selectedBusinessForScores.value = biz
 }
 
 /**
@@ -118,81 +119,82 @@ function viewReport(biz) {
  * @param {object} questionnaire The questionnaire object to be edited.
  */
 function editQuestionnaire(questionnaire) {
-  router.push({ name: 'EditQuestionnairePage', params: { questionnaireId: questionnaire.id } })
+  router.push({ name: 'adminQuestionnaire', params: { questionnaireId: questionnaire.id } })
 }
 
 /**
  * Handles adding a new questionnaire.
  */
 function addNewQuestionnaire() {
-  router.push({ name: 'EditQuestionnairePage', params: { questionnaireId: 'new' } })
+  router.push({ name: 'adminQuestionnaire', params: { questionnaireId: 'new' } })
 }
 
 /**
  * Logs out the admin and navigates to the home page.
  */
 function logout() {
-  // This should ideally trigger an event to the parent App.vue to handle actual logout logic
-  router.push('/') // Navigate to home page
   console.log('Admin logged out')
-}
-
-/**
- * Closes the welcome modal.
- */
-function closeWelcomeModal() {
-  showWelcomeModal.value = false
+  authStore.logout() // Use the store's logout action
+  router.push('/login') // Redirect to login page after logout
 }
 </script>
 
 <template>
+  <!-- Main container for the admin dashboard: full height, light gray background -->
   <div class="min-h-screen bg-gray-100 font-sans">
-    <!-- Top Navigation / Header -->
+    <!-- Admin Dashboard Header: White background, shadow, flex layout for alignment -->
     <header
       class="bg-white shadow-sm py-4 px-6 flex justify-between items-center sticky top-0 z-20"
     >
       <div class="flex items-center">
-        <router-link to="/" class="text-2xl font-extrabold text-blue-600">ITIVA Admin</router-link>
+        <!-- ITIVA Admin link now correctly points to the admin dashboard -->
+        <RouterLink to="/admin/dashboard" class="text-2xl font-bold"
+          >IT<span class="text-blue-600">I</span>VA
+          <span class="text-blue-600">Admin</span></RouterLink
+        >
       </div>
       <nav class="flex items-center space-x-4">
         <button
           @click="addNewQuestionnaire"
-          class="px-4 py-2 rounded-md text-sm font-medium bg-green-600 text-white hover:bg-green-700 transition-colors"
+          class="px-4 py-2 cursor-pointer rounded-md text-sm font-medium bg-green-600 text-white hover:bg-green-700 transition-colors duration-200"
         >
           Add New Questionnaire
         </button>
         <button
           @click="logout"
-          class="px-4 py-2 rounded-md text-sm font-medium border border-gray-300 text-gray-700 hover:bg-gray-100 transition-colors"
+          class="px-4 py-2 cursor-pointer rounded-md text-sm font-medium border border-gray-300 text-gray-700 hover:bg-gray-100 transition-colors duration-200"
         >
           Logout
         </button>
       </nav>
     </header>
 
-    <!-- Main Content Area -->
+    <!-- Main Content Area: Centered, padded, responsive -->
     <main class="container mx-auto px-6 py-8">
       <h1 class="text-3xl font-bold text-gray-900 mb-6">Admin Dashboard</h1>
 
-      <!-- Overview Cards -->
+      <!-- Overview Cards: Grid layout for key metrics -->
       <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <!-- Total Users Card -->
         <div class="bg-white rounded-lg shadow p-6 text-center">
           <h3 class="text-xl font-semibold text-gray-700 mb-2">Total Users</h3>
           <p class="text-5xl font-extrabold text-blue-600">{{ totalUsers }}</p>
         </div>
+        <!-- Active Assessments Card -->
         <div class="bg-white rounded-lg shadow p-6 text-center">
           <h3 class="text-xl font-semibold text-gray-700 mb-2">Active Assessments</h3>
           <p class="text-5xl font-extrabold text-purple-600">{{ activeAssessments }}</p>
         </div>
+        <!-- Pending Approvals Card -->
         <div class="bg-white rounded-lg shadow p-6 text-center">
           <h3 class="text-xl font-semibold text-gray-700 mb-2">Pending Approvals</h3>
           <p class="text-5xl font-extrabold text-yellow-600">{{ pendingApprovals }}</p>
         </div>
       </div>
 
-      <!-- Business Management Section -->
+      <!-- Business Management Section: Split into 2 columns with progress bars -->
       <section class="bg-white rounded-lg shadow p-6 mb-8">
-        <h2 class="text-2xl font-semibold text-gray-800 mb-4">Business Ranking</h2>
+        <h2 class="text-2xl font-semibold text-gray-800 mb-4">Business Overview and Management</h2>
         <div class="mb-4 flex flex-col sm:flex-row justify-between items-center gap-4">
           <input
             type="text"
@@ -210,7 +212,7 @@ function closeWelcomeModal() {
               ]"
             >
               Score
-              <span v-if="sortKey === 'score'">{{ sortOrder === 1 ? ' ▲' : ' ▼' }}</span>
+              <span v-if="sortKey === 'score'">{{ sortOrder === 0 ? ' ▲' : ' ▼' }}</span>
             </button>
             <button
               @click="toggleSort('name')"
@@ -220,7 +222,7 @@ function closeWelcomeModal() {
               ]"
             >
               Name
-              <span v-if="sortKey === 'name'">{{ sortOrder === 1 ? ' ▲' : ' ▼' }}</span>
+              <span v-if="sortKey === 'name'">{{ sortOrder === 0 ? ' ▲' : ' ▼' }}</span>
             </button>
             <button
               @click="toggleSort('location')"
@@ -230,7 +232,7 @@ function closeWelcomeModal() {
               ]"
             >
               Location
-              <span v-if="sortKey === 'location'">{{ sortOrder === 1 ? ' ▲' : ' ▼' }}</span>
+              <span v-if="sortKey === 'location'">{{ sortOrder === 0 ? ' ▲' : ' ▼' }}</span>
             </button>
             <button
               @click="toggleSort('type')"
@@ -240,51 +242,111 @@ function closeWelcomeModal() {
               ]"
             >
               Type
-              <span v-if="sortKey === 'type'">{{ sortOrder === 1 ? ' ▲' : ' ▼' }}</span>
+              <span v-if="sortKey === 'type'">{{ sortOrder === 0 ? ' ▲' : ' ▼' }}</span>
             </button>
           </div>
         </div>
-        <div class="h-96 overflow-y-auto custom-scrollbar">
-          <ul class="space-y-3">
-            <li
-              v-for="biz in filteredAndSortedBusinesses"
-              :key="biz.rank"
-              @click="viewReport(biz)"
-              class="p-4 rounded-lg hover:bg-gray-50 cursor-pointer flex items-center justify-between border border-gray-200 transition-colors duration-200"
+
+        <!-- Split view for Business List and Category Scores with Progress Bars -->
+        <div class="flex flex-col lg:flex-row gap-6">
+          <!-- Left Side: Business List (Scrollable) -->
+          <div
+            class="w-full lg:w-1/2 h-96 overflow-y-auto custom-scrollbar bg-gray-50 p-4 pt-0 rounded-lg border border-gray-200"
+          >
+            <h3 class="text-lg font-semibold text-gray-800 mb-4 sticky top-0 bg-gray-50 py-2 z-10">
+              Business List
+            </h3>
+            <ul class="space-y-3">
+              <li
+                v-for="biz in filteredAndSortedBusinesses"
+                :key="biz.id"
+                @click="selectBusinessForScores(biz)"
+                class="p-4 rounded-lg hover:bg-white cursor-pointer flex items-center justify-between border border-gray-200 transition-colors duration-200"
+                :class="{
+                  'bg-blue-100 border-blue-300':
+                    selectedBusinessForScores && selectedBusinessForScores.id === biz.id,
+                }"
+              >
+                <div class="flex items-center">
+                  <span class="font-bold text-gray-400 mr-4 w-6 text-center">{{ biz.rank }}</span>
+                  <div>
+                    <p class="font-bold text-gray-900 text-lg">{{ biz.name }}</p>
+                    <p class="text-sm text-gray-600">{{ biz.location }} - {{ biz.type }}</p>
+                  </div>
+                </div>
+                <div class="flex items-center space-x-4">
+                  <span
+                    class="font-extrabold text-xl"
+                    :class="
+                      biz.score > 75
+                        ? 'text-green-600'
+                        : biz.score > 50
+                          ? 'text-yellow-600'
+                          : 'text-red-600'
+                    "
+                  >
+                    {{ biz.score }}
+                  </span>
+                  <span
+                    :class="[
+                      'px-3 py-1 text-xs font-semibold rounded-full',
+                      biz.status === 'Active'
+                        ? 'bg-green-100 text-green-800'
+                        : 'bg-yellow-100 text-yellow-800',
+                    ]"
+                  >
+                    {{ biz.status }}
+                  </span>
+                </div>
+              </li>
+            </ul>
+            <div
+              v-if="filteredAndSortedBusinesses.length === 0"
+              class="text-center py-8 text-gray-500"
             >
-              <div class="flex items-center">
-                <span class="font-bold text-gray-400 mr-4 w-6 text-center">{{ biz.rank }}</span>
-                <div>
-                  <p class="font-bold text-gray-900 text-lg">{{ biz.name }}</p>
-                  <p class="text-sm text-gray-600">{{ biz.location }} - {{ biz.type }}</p>
+              No businesses found matching your criteria.
+            </div>
+          </div>
+
+          <!-- Right Side: Category Scores with Progress Bars (shows for selectedBusinessForScores) -->
+          <div
+            class="w-full lg:w-1/2 bg-gray-50 p-4 rounded-lg border border-gray-200 flex flex-col justify-start"
+          >
+            <h3 class="text-8xl font-bold text-green-600 mb-2">
+              {{ selectedBusinessForScores.score }}
+            </h3>
+            <div v-if="selectedBusinessForScores">
+              <p class="text-xl font-bold text-yellow-600 mb-4">
+                {{ selectedBusinessForScores.name }}'s Scores
+              </p>
+              <div class="space-y-2">
+                <div
+                  v-for="category in selectedBusinessForScores.categoryScores"
+                  :key="category.key"
+                >
+                  <p class="text-sm font-medium text-gray-700 mb-2">{{ category.name }}</p>
+                  <div class="w-full bg-gray-200 rounded-full h-4">
+                    <div
+                      class="h-full rounded-full flex items-center justify-end pr-2 text-xs font-bold text-white transition-all duration-500"
+                      :class="{
+                        'bg-green-500': category.score >= 85,
+                        'bg-emerald-500': category.score >= 75 && category.score < 85,
+                        'bg-yellow-500': category.score >= 65 && category.score < 75,
+                        'bg-orange-500': category.score >= 50 && category.score < 65,
+                        'bg-red-500': category.score < 50,
+                      }"
+                      :style="{ width: `${category.score}%` }"
+                    >
+                      {{ category.score }}%
+                    </div>
+                  </div>
                 </div>
               </div>
-              <div class="flex items-center space-x-4">
-                <span
-                  class="font-extrabold text-xl"
-                  :class="
-                    biz.score > 75
-                      ? 'text-green-600'
-                      : biz.score > 50
-                        ? 'text-yellow-600'
-                        : 'text-red-600'
-                  "
-                >
-                  {{ biz.score }}
-                </span>
-                <span
-                  :class="[
-                    'px-3 py-1 text-xs font-semibold rounded-full',
-                    biz.status === 'Active'
-                      ? 'bg-green-100 text-green-800'
-                      : 'bg-yellow-100 text-yellow-800',
-                  ]"
-                >
-                  {{ biz.status }}
-                </span>
-              </div>
-            </li>
-          </ul>
+            </div>
+            <div v-else class="text-center py-8 text-gray-500">
+              Select a business from the list to view its category scores.
+            </div>
+          </div>
         </div>
       </section>
 
@@ -294,7 +356,7 @@ function closeWelcomeModal() {
         <div class="mb-4">
           <button
             @click="addNewQuestionnaire"
-            class="px-5 py-2 bg-blue-600 text-white rounded-md font-semibold hover:bg-blue-700 transition-colors"
+            class="px-5 py-2 bg-blue-600 text-white rounded-md font-semibold hover:bg-blue-700 transition-colors duration-200"
           >
             Create New Questionnaire
           </button>
@@ -358,7 +420,7 @@ function closeWelcomeModal() {
                 <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                   <button
                     @click="editQuestionnaire(q)"
-                    class="text-indigo-600 hover:text-indigo-900 transition-colors"
+                    class="text-indigo-600 hover:text-indigo-900 transition-colors duration-200"
                   >
                     Edit
                   </button>
@@ -369,66 +431,24 @@ function closeWelcomeModal() {
         </div>
       </section>
     </main>
-
-    <!-- Welcome Modal -->
-    <div
-      v-if="showWelcomeModal"
-      class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50"
-    >
-      <div
-        class="bg-white rounded-lg shadow-xl p-8 max-w-md w-full text-center relative transform transition-all duration-300 scale-100 opacity-100"
-      >
-        <button
-          @click="closeWelcomeModal"
-          class="absolute top-4 right-4 text-gray-400 hover:text-gray-600"
-        >
-          <svg
-            class="w-6 h-6"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-            xmlns="http://www.w3.org/2000/svg"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M6 18L18 6M6 6l12 12"
-            ></path>
-          </svg>
-        </button>
-        <h3 class="text-3xl font-bold text-blue-600 mb-4">Admin Access Granted!</h3>
-        <p class="text-gray-700 mb-6">
-          Manage users, businesses, and questionnaires from this powerful dashboard.
-        </p>
-        <button
-          @click="closeWelcomeModal"
-          class="bg-blue-600 text-white font-semibold py-2 px-6 rounded-md hover:bg-blue-700 transition-colors"
-        >
-          Continue
-        </button>
-      </div>
-    </div>
   </div>
 </template>
 
 <style scoped>
-/* Custom scrollbar for better aesthetics */
-.custom-scrollbar::-webkit-scrollbar {
-  width: 8px;
+/*
+  Scoped styles for the flash-out-fade transition specific to this component.
+  This defines how the modal will fade out.
+*/
+.flash-out-fade-enter-active,
+.flash-out-fade-leave-active {
+  transition:
+    opacity 0.5s ease,
+    transform 0.5s ease;
 }
 
-.custom-scrollbar::-webkit-scrollbar-track {
-  background: #f0f0f0; /* Light gray track */
-  border-radius: 4px;
-}
-
-.custom-scrollbar::-webkit-scrollbar-thumb {
-  background: #a0a0a0; /* Darker gray thumb */
-  border-radius: 4px;
-}
-
-.custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: #888; /* Even darker on hover */
+.flash-out-fade-enter-from,
+.flash-out-fade-leave-to {
+  opacity: 0;
+  transform: translateY(-20px); /* Moves up slightly while fading out */
 }
 </style>

@@ -2,3 +2,21 @@ Features to Add
 Businesses need to Submit their business certificate to prevent any user from creating an account and claiming to be a representative of that business, therefore, generate false info, or an insider within the company looking for exploitations within company's IT infrastructure, or someone with inside info about the company's IT uses the platform to identify weaknesses for attack.
 
 Registration could require user register with business domain name, so that the domain name is used to verify the account as extra security.
+
+Add User feature to link social media accounts. Place it in settings
+
+Admin Verifies user account
+
+Admin business expands Admin views users logs
+
+Provide users with feature to continue questionnaire later. They can get reminder notification to finish their questionnaire. They would even get notifications when a new questionnaire has been introduce or updated by a new standard.
+
+The User Preference category can be updated to know what users expect from this service
+
+An Admin Graph could be used to plot these preferences
+
+Develop Report Recommendations for each option in every questionnaire
+
+Consider group multiple option recommendation to match one Report Recommendation on the "Prioritized Recommendations" Table.
+
+Import questions in table format e.g., csv, xslx etc.
