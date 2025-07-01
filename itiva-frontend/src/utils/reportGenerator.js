@@ -29,38 +29,39 @@ export function generateMockReport(targetScores) {
     const categoryQuestions = questionsByShortKeyMap[shortKey] || []
     const questionCount = categoryQuestions.length
     if (questionCount === 0) {
-      finalScores[shortKey] = targetScore
+      // finalScores[shortKey] = targetScore
+      finalScores[shortKey] = 0 // No questions means no score
       continue
     }
 
     const maxCategoryScore = 100
-    let scoreDeficit = maxCategoryScore - targetScore
+    // let scoreDeficit = maxCategoryScore - targetScore
+    const scoreDeficit = maxCategoryScore - targetScore
     let currentCategoryScore = 0
     const answersForCategory = {}
 
-    categoryQuestions.forEach((q) => {
-      const perfectOption = q.options.find((opt) => parseFloat(opt.score) === 2)
-      answersForCategory[q.id] = perfectOption
+    // Calculate how many questions need to be sub-optimal to meet the target score
+    const maxPointsPerQuestion = 100 / questionCount
+    // Smallest possible point loss is by choosing score +1 instead of +2
+    const smallestPointLoss = ((2 - 1) / 4) * maxPointsPerQuestion
+    let questionsToChange = 0
+    if (smallestPointLoss > 0) {
+      questionsToChange = Math.round(scoreDeficit / smallestPointLoss)
+    }
+    questionsToChange = Math.min(questionsToChange, questionCount)
+
+    // Assign answers based on the calculation
+    categoryQuestions.forEach((q, index) => {
+      const optionsSorted = [...q.options].sort((a, b) => b.score - a.score)
+      // Change the first 'questionsToChange' questions to be sub-optimal
+      if (index < questionsToChange) {
+        answersForCategory[q.id] = optionsSorted[1] || optionsSorted[0] // Second best option
+      } else {
+        answersForCategory[q.id] = optionsSorted[0] // Perfect option
+      }
     })
 
-    for (const q of categoryQuestions) {
-      if (scoreDeficit <= 0) break
-      const optionsSorted = [...q.options].sort((a, b) => b.score - a.score)
-      const perfectOption = optionsSorted[0]
-      const maxPointsPerQuestion = 100 / questionCount
-      for (let i = 1; i < optionsSorted.length; i++) {
-        const currentOption = optionsSorted[i]
-        const pointsLost =
-          ((parseFloat(perfectOption.score) - parseFloat(currentOption.score)) / 4) *
-          maxPointsPerQuestion
-        if (pointsLost <= scoreDeficit) {
-          answersForCategory[q.id] = currentOption
-          scoreDeficit -= pointsLost
-          break
-        }
-      }
-    }
-
+    // Calculate final score and recommendations from the chosen answers
     categoryQuestions.forEach((q) => {
       const selectedOption = answersForCategory[q.id]
       const impactValue = selectedOption ? parseFloat(selectedOption.score) : NaN
@@ -81,7 +82,13 @@ export function generateMockReport(targetScores) {
     finalScores[shortKey] = Math.round(currentCategoryScore)
   }
 
-  const overall = Math.round(Object.values(finalScores).reduce((a, b) => a + b, 0) / 4)
+  // const overall = Math.round(Object.values(finalScores).reduce((a, b) => a + b, 0) / 4)
+  const scoreValues = Object.values(finalScores)
+  // const overall = Math.round(scoreValues.reduce((a, b) => a + b, 0) / scoreValues.length)
+  const overall =
+    scoreValues.length > 0
+      ? Math.round(scoreValues.reduce((a, b) => a + b, 0) / scoreValues.length)
+      : 0
   const fullRecommendations = allRecommendations.sort((a, b) => b.impactScore - a.impactScore)
 
   return {

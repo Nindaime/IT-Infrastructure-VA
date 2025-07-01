@@ -1,13 +1,18 @@
-<!-- src/views/QuestionnairePage.vue -->
+<!-- @file src/views/QuestionnairePage.vue
+@description This is the main view for taking an assessment. It manages question
+navigation, answer selection, and the lifecycle of a draft session. It interacts
+with both the assessmentStore (for the active session) and the reportsStore (for
+saving/updating the draft in the user's main list).  -->
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
-import { useRouter, useRoute } from 'vue-router'
+import { ref, computed, onMounted, onBeforeUnmount, inject } from 'vue'
+import { useRouter, useRoute, onBeforeRouteLeave, onBeforeRouteUpdate } from 'vue-router'
 import { fullQuestionnaireData } from '@/api/mockData' // Using the new detailed questionnaire data
 import { useReportsStore } from '@/stores/reports' // Import the reports store
 import { useAssessmentStore } from '@/stores/assessment' // Import the assessment store
 import { useAuthStore } from '@/stores/auth' // Import the auth store
 import AppHeader from '@/components/AppHeader.vue'
 import AppFooter from '@/components/AppFooter.vue'
+import DraftSaveModal from '@/components/DraftSaveModal.vue'
 
 const router = useRouter()
 const route = useRoute()
@@ -26,13 +31,33 @@ const isLoading = ref(false)
 const showSuccessModal = ref(false)
 const showSwitchConfirmModal = ref(false)
 const showReportNameModal = ref(false)
+const showDraftSaveModal = ref(false)
 const newReportName = ref('')
 const targetAssessmentType = ref('')
+const pendingNavigation = ref(null)
+const isNavigatingAfterSubmit = ref(false) // Flag to bypass the leave guard on successful submission
+
+// Enhanced UX states
+const isSubmitting = ref(false) // Used for the final submission button
+const showKeyboardHelp = ref(true) // Set to true to always show help
 
 // Initialize the auth store
 const authStore = useAuthStore()
 const assessmentStore = useAssessmentStore()
 const reportsStore = useReportsStore()
+
+// Get toast functions
+const showToast = inject('showToast')
+
+/**
+ * A computed property to determine the name for the draft save modal.
+ * If continuing an existing draft, it uses the draft's current name.
+ * Otherwise, it returns a falsy value, signaling the modal to generate a default name.
+ * This avoids passing a new Date object on every render, which can cause Vue reconciliation issues.
+ */
+const draftNameToSave = computed(() => {
+  return assessmentStore.currentDraft?.name || ''
+})
 
 const assessmentType = ref('') // Will be set from route params
 
@@ -43,30 +68,166 @@ const questionsWithIndex = ref(questions.value.map((q, index) => ({ ...q, origin
 const categoryStyles = {
   'Website Strength': { color: 'bg-blue-500' },
   'Devices & Network': { color: 'bg-green-500' },
-  'Compliance & Documentation': { color: 'bg-purple-500' },
+  'Compliance Documentation': { color: 'bg-yellow-500' },
   'Cyber Security Implementations': { color: 'bg-red-500' },
 }
 const defaultCategoryStyle = { color: 'bg-gray-500' }
 
 // --- Lifecycle Hooks ---
+/**
+ * Initializes the assessment state based on the route. It either continues
+ * an existing draft or starts a new one. This is the single source of truth
+ * for component initialization.
+ * @param {string | undefined} type The assessment type from the route params.
+ */
+function initializeAssessment(type) {
+  const typeToLoad = type || 'Standard ITIVA Assessment'
+  assessmentType.value = typeToLoad
+
+  assessmentStore.loadDraftFromStorage()
+
+  const shouldContinueStoreDraft =
+    assessmentStore.hasActiveDraft && assessmentStore.currentDraft.type === typeToLoad
+
+  if (shouldContinueStoreDraft) {
+    const draft = assessmentStore.currentDraft
+    // Validate that the draft has questions before assigning them.
+    if (draft && Array.isArray(draft.questions) && draft.questions.length > 0) {
+      questions.value = draft.questions
+      answers.value = { ...draft.answers }
+      currentQuestionIndex.value = draft.lastQuestionIndex || 0 // Ensure index is valid
+    } else {
+      // If the draft is corrupt or has no questions, start a new one as a fallback.
+      console.warn('Draft data is invalid or empty. Starting a new assessment.')
+      resetStateAndStartNewDraft(typeToLoad)
+    }
+  } else {
+    // This path is for starting a brand new assessment.
+    resetStateAndStartNewDraft(typeToLoad)
+  }
+}
+
+/**
+ * Handles the logic when the user confirms saving a draft from the modal.
+ * This function now uses the intelligent `saveOrUpdateDraft` action.
+ */
+async function handleDraftSave(draftName) {
+  try {
+    if (assessmentStore.hasActiveDraft) {
+      // 1. Prepare the complete draft object from the active session.
+      const draftData = {
+        ...assessmentStore.currentDraft,
+        // Ensure date exists. If the draft is new, create a date. If it's being
+        // continued, its original date will be preserved from the spread.
+        date: assessmentStore.currentDraft.date || new Date().toISOString().split('T')[0],
+        name: draftName, // Update the name
+        // Use lastModified for drafts to track the latest save time for sorting.
+        // The original 'date' property should represent the creation date.
+        lastModified: new Date().toISOString(),
+      }
+
+      // 2. Call the single, intelligent action in the reports store.
+      const result = await reportsStore.saveOrUpdateDraft(draftData)
+
+      // 3. Show feedback to the user based on the operation performed.
+      if (result.success) {
+        showToast(
+          result.operation === 'updated'
+            ? 'Draft updated successfully'
+            : 'Draft saved successfully',
+          'success',
+        )
+      }
+      showDraftSaveModal.value = false
+    }
+
+    // 4. If navigation was pending, complete it now.
+    if (pendingNavigation.value) {
+      assessmentStore.clearDraft()
+      await router.push(pendingNavigation.value)
+      pendingNavigation.value = null
+    }
+  } catch (error) {
+    console.error('Error saving draft:', error)
+    showToast(`Failed to save draft: ${error.message}`, 'error')
+  }
+}
+
+async function handleDraftDiscard() {
+  // Clear the draft without saving
+  assessmentStore.clearDraft()
+  showDraftSaveModal.value = false
+
+  // Proceed with navigation if there was a pending navigation
+  if (pendingNavigation.value) {
+    await router.push(pendingNavigation.value)
+    pendingNavigation.value = null
+  }
+}
+
+function handleDraftCancel() {
+  showDraftSaveModal.value = false
+  pendingNavigation.value = null
+}
+
 onMounted(() => {
-  // Set the assessment type from the route parameter if it exists
-  if (route.params.type) {
-    assessmentType.value = route.params.type
-    console.log('Assessment Type:', assessmentType.value)
+  // Initialize the component state based on the current route.
+  initializeAssessment(route.params.type)
+  // Add keyboard shortcuts
+  window.addEventListener('keydown', handleKeyboardShortcuts)
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('keydown', handleKeyboardShortcuts)
+})
+
+onBeforeRouteUpdate((to, from) => {
+  // This guard only runs when switching between assessment types on the same page.
+  // It will NOT run when navigating away, thus preserving the report state.
+  if (to.params.type !== from.params.type) {
+    initializeAssessment(to.params.type)
   }
 })
 
-watch(
-  () => route.params.type,
-  (newType) => {
-    if (newType && newType !== assessmentType.value) {
-      assessmentType.value = newType
-      resetState()
-    }
-  },
-  { immediate: true }, // Ensure watcher runs on initial component mount
-)
+onBeforeRouteLeave((to) => {
+  // If we are navigating after a successful submission, allow it immediately.
+  if (isNavigatingAfterSubmit.value) {
+    return true
+  }
+
+  // This guard is triggered when the user tries to navigate away.
+  // We check if there is an active, unsaved draft.
+  if (assessmentStore.hasActiveDraft && assessmentStore.isDraftMode) {
+    // 1. Perform a final, silent save of the current progress.
+    saveDraftProgress()
+
+    // 2. Show the toast notification as requested.
+    showToast('Progress saved automatically', 'success', 1500)
+
+    // 3. Show the modal to ask the user if they want to save the draft to their list.
+    showDraftSaveModal.value = true
+
+    // 4. Store the intended destination, so we can navigate there after the user makes a choice.
+    pendingNavigation.value = to
+
+    // 5. Cancel the current navigation attempt. The user's choice in the modal will trigger the navigation later.
+    return false
+  }
+
+  // If there's no active draft, allow the navigation to proceed without any prompts.
+  return true
+})
+
+function saveDraftProgress() {
+  if (assessmentStore.isDraftMode) {
+    // Use the batch update action for efficiency.
+    // This sends the entire state of answers and the current index in one go silently.
+    assessmentStore.updateDraft({
+      answers: answers.value,
+      lastQuestionIndex: currentQuestionIndex.value,
+    })
+  }
+}
 
 // --- Computed Properties ---
 const currentQuestion = computed(() => questions.value[currentQuestionIndex.value])
@@ -189,29 +350,30 @@ function generateReportFromAnswers() {
   return { overall, ws, dn, cd, cs, recommendations: fullRecommendations }
 }
 
-function resetState() {
+function resetStateAndStartNewDraft(type) {
+  questions.value = fullQuestionnaireData // Reset to full questionnaire
+  answers.value = questions.value.reduce((acc, q) => ({ ...acc, [q.id]: null }), {})
   currentQuestionIndex.value = 0
-  answers.value = questions.value.reduce((acc, q) => {
-    acc[q.id] = null
-    return acc
-  }, {})
-  // Reset other relevant state if any
+  assessmentStore.startDraft(type, JSON.parse(JSON.stringify(questions.value)))
 }
 
 function nextQuestion() {
   if (!isLastQuestion.value) {
     currentQuestionIndex.value++
+    saveDraftProgress()
   }
 }
 
 function prevQuestion() {
   if (!isFirstQuestion.value) {
     currentQuestionIndex.value--
+    saveDraftProgress()
   }
 }
 
 function selectAnswer(option) {
   answers.value[currentQuestion.value.id] = option // option is now an object
+  saveDraftProgress()
   setTimeout(() => {
     if (!isLastQuestion.value) {
       nextQuestion()
@@ -231,29 +393,56 @@ async function handleReportNameSubmission() {
     return
   }
 
-  const reportName = newReportName.value.trim()
-  showReportNameModal.value = false
+  try {
+    const reportName = newReportName.value.trim()
+    showReportNameModal.value = false
 
-  // Show loading/success modal
-  isLoading.value = true
-  await new Promise((resolve) => setTimeout(resolve, 500)) // Simulate processing
-  isLoading.value = false
-  showSuccessModal.value = true
+    // Show loading/success modal
+    isSubmitting.value = true
+    isLoading.value = true
+    await new Promise((resolve) => setTimeout(resolve, 500)) // Simulate processing
+    isLoading.value = false
+    showSuccessModal.value = true
 
-  // Generate report and update stores
-  const report = generateReportFromAnswers()
-  assessmentStore.setGeneratedReport(report, reportName, assessmentType.value)
-  reportsStore.addReport({
-    name: reportName,
-    date: new Date().toISOString().split('T')[0],
-    type: assessmentType.value,
-    score: report.overall,
-    report: report,
-  })
+    // Generate report
+    const report = generateReportFromAnswers()
+    assessmentStore.setGeneratedReport(report, reportName, assessmentType.value)
 
-  // Wait for success modal to be visible, then navigate
-  await new Promise((resolve) => setTimeout(resolve, 2000))
-  router.push({ name: 'ReportViewerPage' })
+    // If the assessment was started from a draft, we need to remove the old draft entry
+    // from the reports store if it exists.
+    if (assessmentStore.isDraftMode) {
+      // This will safely remove the draft by its ID.
+      // If it was never saved to the reports list, this will do nothing.
+      // Ensure we are deleting a *draft* by its ID. This prevents accidental
+      // deletion of a *completed report* if something goes wrong.
+      if (assessmentStore.currentDraft.isDraft) {
+        reportsStore.deleteReport(assessmentStore.currentDraft.id)
+      }
+    }
+
+    // Add the new, completed report to the reports store.
+    reportsStore.addReport({
+      name: reportName,
+      date: new Date().toISOString().split('T')[0],
+      type: assessmentType.value,
+      score: report.overall,
+      report: report,
+    })
+
+    // Set the flag to true right before navigating to bypass the onBeforeRouteLeave guard.
+    isNavigatingAfterSubmit.value = true
+
+    // Wait for success modal to be visible, then navigate
+    await new Promise((resolve) => setTimeout(resolve, 2000))
+    await router.push({ name: 'ReportViewerPage' })
+  } catch (error) {
+    console.error('Error during report submission or navigation:', error)
+    showToast('Failed to finalize report. Please try again.', 'error')
+    // Reset state in case of failure
+    isNavigatingAfterSubmit.value = false
+    isSubmitting.value = false
+    showSuccessModal.value = false
+  }
 }
 
 function promptSwitchAssessment(type) {
@@ -271,6 +460,58 @@ function executeSwitchAssessment() {
 
 function cancelSwitch() {
   showSwitchConfirmModal.value = false
+}
+
+// --- Keyboard Shortcuts ---
+function handleKeyboardShortcuts(event) {
+  // Only handle shortcuts if no modal is open
+  if (
+    showDraftSaveModal.value ||
+    showReportNameModal.value ||
+    showSuccessModal.value ||
+    showSwitchConfirmModal.value
+  ) {
+    return
+  }
+
+  switch (event.key) {
+    case 'ArrowLeft':
+      if (!isFirstQuestion.value) {
+        event.preventDefault()
+        prevQuestion()
+      }
+      break
+    case 'ArrowRight':
+    case ' ':
+      if (!isLastQuestion.value && answers.value[currentQuestion.value.id]) {
+        event.preventDefault()
+        nextQuestion()
+      }
+      break
+    case 'Enter':
+      if (isLastQuestion.value && answers.value[currentQuestion.value.id] && !isSubmitting.value) {
+        event.preventDefault()
+        submitAssessment()
+      }
+      break
+    case '1':
+    case '2':
+    case '3':
+    case '4':
+      if (currentQuestion.value.options.length >= parseInt(event.key)) {
+        event.preventDefault()
+        const optionIndex = parseInt(event.key) - 1
+        selectAnswer(currentQuestion.value.options[optionIndex])
+      }
+      break
+    case '5':
+      if (currentQuestion.value.options.length >= parseInt(event.key)) {
+        event.preventDefault()
+        const optionIndex = parseInt(event.key) - 1
+        selectAnswer(currentQuestion.value.options[optionIndex])
+      }
+      break
+  }
 }
 </script>
 
@@ -295,6 +536,49 @@ function cancelSwitch() {
           <p class="text-gray-500 mt-2">
             Question {{ currentQuestionIndex + 1 }} of {{ totalQuestions }}
           </p>
+          <!-- Draft indicator -->
+          <div v-if="assessmentStore.isDraftMode" class="mt-2">
+            <span
+              class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-yellow-100 text-yellow-800"
+            >
+              <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                ></path>
+              </svg>
+              Draft - {{ assessmentStore.draftCompletionPercentage }}% Complete
+            </span>
+          </div>
+
+          <!-- Keyboard shortcuts help -->
+          <div class="mt-2">
+            <div
+              v-if="showKeyboardHelp"
+              class="mt-2 p-3 bg-gray-50 rounded-lg text-xs text-gray-600"
+            >
+              <p class="font-medium mb-1">Keyboard shortcuts:</p>
+              <ul class="space-y-1">
+                <li>
+                  <kbd class="px-1 py-0.5 bg-gray-200 rounded text-xs">←</kbd> Previous question
+                </li>
+                <li>
+                  <kbd class="px-1 py-0.5 bg-gray-200 rounded text-xs">→</kbd> or
+                  <kbd class="px-1 py-0.5 bg-gray-200 rounded text-xs">Space</kbd> Next question
+                </li>
+                <li>
+                  <kbd class="px-1 py-0.5 bg-gray-200 rounded text-xs">1-5</kbd> Select answer
+                  option
+                </li>
+                <li>
+                  <kbd class="px-1 py-0.5 bg-gray-200 rounded text-xs">Enter</kbd> Submit assessment
+                  (on last question)
+                </li>
+              </ul>
+            </div>
+          </div>
         </div>
 
         <!-- Segmented Progress Bar -->
@@ -335,14 +619,22 @@ function cancelSwitch() {
               </h2>
               <div class="space-y-4">
                 <button
-                  v-for="option in currentQuestion.options"
+                  v-for="(option, index) in currentQuestion.options"
                   :key="option.text"
                   @click="selectAnswer(option)"
-                  class="w-full cursor-pointer text-left p-4 border-2 rounded-lg text-gray-700 transition-all duration-200 flex items-center justify-between"
+                  @keydown.enter="selectAnswer(option)"
+                  @keydown.space.prevent="selectAnswer(option)"
+                  :aria-label="`Select option ${index + 1}: ${option.text}`"
+                  :aria-describedby="`explanation-${currentQuestion.id}-${index}`"
+                  role="radio"
+                  :aria-checked="answers[currentQuestion.id]?.text === option.text"
+                  tabindex="0"
+                  class="w-full cursor-pointer text-left p-4 border-2 rounded-lg text-gray-700 transition-all duration-200 flex items-center justify-between focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
                   :class="{
-                    'bg-blue-100 border-blue-500 shadow-md': answers[currentQuestion.id] === option,
+                    'bg-blue-100 border-blue-500 shadow-md':
+                      answers[currentQuestion.id]?.text === option.text,
                     'hover:bg-gray-100 hover:border-gray-400 border-gray-300':
-                      answers[currentQuestion.id] !== option,
+                      answers[currentQuestion.id]?.text !== option.text,
                   }"
                 >
                   <span class="flex-1 mr-4">{{ option.text }}</span>
@@ -353,6 +645,7 @@ function cancelSwitch() {
                       stroke="currentColor"
                       viewBox="0 0 24 24"
                       xmlns="http://www.w3.org/2000/svg"
+                      aria-hidden="true"
                     >
                       <path
                         stroke-linecap="round"
@@ -362,7 +655,9 @@ function cancelSwitch() {
                       ></path>
                     </svg>
                     <div
+                      :id="`explanation-${currentQuestion.id}-${index}`"
                       class="absolute bottom-full right-0 mb-2 w-72 p-3 text-sm text-white bg-gray-800 rounded-lg opacity-0 group-hover:opacity-95 transition-opacity duration-300 pointer-events-none z-10"
+                      role="tooltip"
                     >
                       {{ option.explanation }}
                     </div>
@@ -377,26 +672,109 @@ function cancelSwitch() {
         <div class="flex justify-between items-center mt-8 pt-6 border-t">
           <button
             @click="prevQuestion"
+            @keydown.enter="prevQuestion"
+            @keydown.space.prevent="prevQuestion"
             :disabled="isFirstQuestion"
-            class="px-6 py-2 cursor-pointer font-semibold text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            :aria-label="
+              isFirstQuestion
+                ? 'Cannot go back, this is the first question'
+                : 'Go to previous question'
+            "
+            class="px-6 py-2 cursor-pointer font-semibold text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed transition-colors focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
           >
+            <svg
+              class="w-4 h-4 mr-2 inline"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M15 19l-7-7 7-7"
+              ></path>
+            </svg>
             Previous
           </button>
 
           <button
             v-if="!isLastQuestion"
             @click="nextQuestion"
-            class="px-6 py-2 cursor-pointer font-semibold text-white bg-blue-600 rounded-md hover:bg-blue-700 transition-colors"
+            @keydown.enter="nextQuestion"
+            @keydown.space.prevent="nextQuestion"
+            :disabled="!answers[currentQuestion.id]"
+            :aria-label="
+              !answers[currentQuestion.id]
+                ? 'Please select an answer to continue'
+                : 'Go to next question'
+            "
+            class="px-6 py-2 cursor-pointer font-semibold text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
           >
             Next
+            <svg
+              class="w-4 h-4 ml-2 inline"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M9 5l7 7-7 7"
+              ></path>
+            </svg>
           </button>
 
           <button
             v-if="isLastQuestion"
             @click="submitAssessment"
-            class="px-6 py-2 cursor-pointer font-semibold text-white bg-green-600 rounded-md hover:bg-green-700 transition-colors"
+            @keydown.enter="submitAssessment"
+            @keydown.space.prevent="submitAssessment"
+            :disabled="isSubmitting || !answers[currentQuestion.id]"
+            :aria-label="isSubmitting ? 'Submitting assessment...' : 'Submit assessment'"
+            class="px-6 py-2 cursor-pointer font-semibold text-white bg-green-600 rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
           >
-            Submit Assessment
+            <svg
+              v-if="isSubmitting"
+              class="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
+              fill="none"
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+            >
+              <circle
+                class="opacity-25"
+                cx="12"
+                cy="12"
+                r="10"
+                stroke="currentColor"
+                stroke-width="4"
+              ></circle>
+              <path
+                class="opacity-75"
+                fill="currentColor"
+                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+              ></path>
+            </svg>
+            <svg
+              v-else
+              class="w-4 h-4 mr-2 inline"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M5 13l4 4L19 7"
+              ></path>
+            </svg>
+            {{ isSubmitting ? 'Submitting...' : 'Submit Assessment' }}
           </button>
         </div>
       </div>
@@ -505,6 +883,15 @@ function cancelSwitch() {
         </div>
       </div>
     </transition>
+
+    <!-- Draft Save Modal -->
+    <DraftSaveModal
+      :show="showDraftSaveModal"
+      :draft-name="draftNameToSave"
+      @save="handleDraftSave"
+      @discard="handleDraftDiscard"
+      @cancel="handleDraftCancel"
+    />
 
     <AppFooter />
   </div>

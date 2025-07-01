@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, computed, nextTick } from 'vue'
+import { ref, onMounted, onBeforeUnmount, computed, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import jsPDF from 'jspdf'
 import html2canvas from 'html2canvas'
@@ -78,8 +78,8 @@ const generateSummary = async (data) => {
 
 const getScoreColor = (score) => {
   // Return hex codes for html2canvas compatibility
-  if (score >= 75) return '#16a34a' // Tailwind green-600
-  if (score > 50) return '#ca8a04' // Tailwind yellow-600
+  if (score >= 80) return '#16a34a' // Tailwind green-600
+  if (score >= 55) return '#ca8a04' // Tailwind yellow-600
   return '#dc2626' // Tailwind red-600
 }
 
@@ -148,6 +148,7 @@ async function downloadReportAsPDF() {
           table th:last-child, table td:last-child { width: 15% !important; }
           th, td { word-wrap: break-word; }
           tr { page-break-inside: avoid !important; } /* Attempt to prevent rows from splitting */
+          .border-b { border-bottom-color: #e5e7eb !important; } /* Use a safe default border color */
           .bg-slate-800 { background-color: #1e293b !important; }
           .text-gray-300 { color: #d1d5db !important; }
           .bg-gray-600 { background-color: #4b5563 !important; }
@@ -159,6 +160,7 @@ async function downloadReportAsPDF() {
           .text-gray-700 { color: #374151 !important; }
           .bg-gray-200 { background-color: #e5e7eb !important; } /* For table header */
           .bg-gray-500 { background-color: #6b7280 !important; } /* For category tags */
+          .text-green-600 { color: #16a34a !important; }
           .text-red-600 { color: #dc2626 !important; }
         `
         clonedDoc.head.appendChild(style)
@@ -233,6 +235,15 @@ onMounted(() => {
       createOrUpdateChart(reportData.value)
     }
   })
+})
+
+onBeforeUnmount(() => {
+  // This is a crucial cleanup step.
+  // The assessmentStore holds the state for the *active* session.
+  // Once the user navigates away from the report, the session is considered
+  // complete, and the store should be cleared to prevent its state from
+  // leaking into the next user action (like starting a new assessment).
+  assessmentStore.clearDraft()
 })
 </script>
 
@@ -366,7 +377,7 @@ onMounted(() => {
                       >
                         {{ rec.category }}
                       </td>
-                      <td class="py-3 px-4 font-bold text-red-600 text-center">
+                      <td class="py-3 px-4 font-bold text-green-600 text-center">
                         +{{ rec.impactScore }} pts
                       </td>
                     </tr>

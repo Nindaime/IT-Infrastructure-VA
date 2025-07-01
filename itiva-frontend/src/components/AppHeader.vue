@@ -1,6 +1,6 @@
 <!-- src/components/AppHeader.vue -->
 <script setup>
-import { ref, defineProps, defineEmits } from 'vue'
+import { ref } from 'vue'
 import { useAssessmentStore } from '@/stores/assessment' // Import the assessment store
 import { useAuthStore } from '@/stores/auth' // Import the auth store
 import { RouterLink, useRouter, useRoute } from 'vue-router'
@@ -92,7 +92,7 @@ function handleLogout() {
     <div class="container mx-auto px-6 py-3">
       <nav class="flex items-center justify-between">
         <!-- Logged-Out Navigation State -->
-        <template v-if="!authStore.isLoggedIn">
+        <template v-if="!authStore.isAuthenticated">
           <RouterLink
             to="/"
             class="text-2xl font-bold text-blue-600 hover:text-blue-700 transition-colors"
@@ -100,10 +100,14 @@ function handleLogout() {
             ITIVA
           </RouterLink>
           <div class="hidden md:flex items-center space-x-6">
-            <RouterLink to="/about" class="text-gray-600 hover:text-blue-600 transition-colors"
+            <RouterLink
+              to="/about"
+              class="text-gray-600 cursor-pointer hover:text-blue-600 transition-colors"
               >About Us</RouterLink
             >
-            <RouterLink to="/login" class="text-gray-600 hover:text-blue-600 transition-colors"
+            <RouterLink
+              to="/login"
+              class="text-gray-600 cursor-pointer hover:text-blue-600 transition-colors"
               >Login</RouterLink
             >
             <RouterLink
@@ -214,7 +218,7 @@ function handleLogout() {
             <div class="relative">
               <button
                 @click="toggleSettingsMenu"
-                class="focus:outline-none p-2 rounded-full hover:bg-gray-100 transition-colors"
+                class="focus:outline-none cursor-pointer p-2 rounded-full hover:bg-gray-100 transition-colors"
               >
                 <svg
                   class="w-6 h-6 text-gray-600 cursor-pointer"

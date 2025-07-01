@@ -1,14 +1,39 @@
 <!-- src/App.vue - Updated to manage global header/footer visibility and notification -->
 <script setup>
-import { computed } from 'vue'
-import { useRoute } from 'vue-router'
+import { computed, ref, provide } from 'vue'
+import { useRoute, RouterView } from 'vue-router'
 // import { useAuthStore } from './stores/auth' // Import the auth store
 import AppHeader from './components/AppHeader.vue' // Global header component
 import AppFooter from './components/AppFooter.vue' // Global footer component
+import ToastNotification from '@/components/ToastNotification.vue'
 
 const route = useRoute()
 
 // Reactive state for global notifications
+const toast = ref({
+  show: false,
+  message: '',
+  type: 'info',
+  duration: 3000,
+})
+
+// Provide toast function to all components
+function showToast(message, type = 'info', duration = 3000) {
+  toast.value = {
+    show: true,
+    message,
+    type,
+    duration,
+  }
+}
+
+function hideToast() {
+  toast.value.show = false
+}
+
+// Provide toast functions globally
+provide('showToast', showToast)
+provide('hideToast', hideToast)
 
 /**
  * Computed property to determine if the global Header and Footer should be shown.
@@ -53,6 +78,15 @@ const showGlobalHeaderAndFooter = computed(() => {
 
     <!-- Global Footer: Only shown if showGlobalHeaderAndFooter is true -->
     <AppFooter v-if="showGlobalHeaderAndFooter" />
+
+    <!-- Global Toast Notification -->
+    <ToastNotification
+      :show="toast.show"
+      :message="toast.message"
+      :type="toast.type"
+      :duration="toast.duration"
+      @close="hideToast"
+    />
   </div>
 </template>
 

@@ -1,21 +1,24 @@
-<!-- src/views/DashboardPage.vue - Final version with custom header, settings dropdown, and improved UI -->
+<!-- src/views/DashboardPage.vue - Enhanced version with better UX and accessibility -->
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, inject } from 'vue'
 import { useAssessmentStore } from '@/stores/assessment' // Import the assessment store
 import { useAuthStore } from '@/stores/auth' // Import the auth store
 import { useReportsStore } from '@/stores/reports' // Import the new reports store
 import { useRouter } from 'vue-router'
 import AppHeader from '@/components/AppHeader.vue'
 import AppFooter from '@/components/AppFooter.vue'
+import SystemTestPanel from '@/components/SystemTestPanel.vue'
 
 // Initialize the Vue Router for navigation
 const router = useRouter()
 
-// Props received from the parent component (e.g., App.vue)
-// No props needed from App.vue anymore
+// Initialize the auth store
 const authStore = useAuthStore()
 const reportsStore = useReportsStore()
 const assessmentStore = useAssessmentStore()
+
+// Get toast functions
+const showToast = inject('showToast')
 
 // Reactive state to control the visibility of the settings dropdown menu
 const showSettingsMenu = ref(false)
@@ -25,20 +28,21 @@ const reportToDeleteId = ref(null)
 // Reactive state for the welcome modal
 const showWelcomeModal = ref(false)
 
-// Computed property to get the latest report for each assessment type
-const latestReportsByType = computed(() => {
-  const latestMap = new Map()
-  // Iterate in reverse to easily get the latest by ID (assuming higher ID means newer)
-  for (let i = reportsStore.userReports.length - 1; i >= 0; i--) {
-    const report = reportsStore.userReports[i]
-    // If we haven't seen this type yet, or if this report is newer (higher ID)
-    // than the one currently stored for this type, update the map.
-    // This assumes IDs are sequential and higher ID means newer.
-    if (!latestMap.has(report.type) || report.id > latestMap.get(report.type).id) {
-      latestMap.set(report.type, report)
-    }
-  }
-  return Array.from(latestMap.values())
+// Reactive state for the system test panel
+const showSystemTestPanel = ref(false)
+
+// Loading states
+const isLoading = ref(false)
+const isDeleting = ref(false)
+
+// Computed properties for better performance
+const completedReports = computed(() => reportsStore.completedReports)
+
+const averageScore = computed(() => {
+  if (completedReports.value.length === 0) return 'N/A'
+  const avg =
+    completedReports.value.reduce((sum, r) => sum + r.score, 0) / completedReports.value.length
+  return avg.toFixed(1)
 })
 
 // --- Grading Logic (copied for consistency) ---
@@ -67,14 +71,27 @@ function getGradeColorClass(grade) {
   }
 }
 
+function getScoreColorClass(score) {
+  if (score >= 80) return 'text-green-600'
+  if (score >= 55) return 'text-yellow-600'
+  return 'text-red-600'
+}
+
 /**
  * Navigates to the ReportViewerPage with the details of the selected report.
  * @param {object} report The report object containing details.
  */
-function viewReport(report) {
-  // The assessment store is still needed to pass the *currently viewed* report to the viewer page
-  assessmentStore.setGeneratedReport(report.report, report.name, report.type)
-  router.push({ name: 'ReportViewerPage' })
+async function viewReport(report) {
+  try {
+    isLoading.value = true
+    // The assessment store is still needed to pass the *currently viewed* report to the viewer page
+    assessmentStore.setGeneratedReport(report.report, report.name, report.type)
+    await router.push({ name: 'ReportViewerPage' })
+  } catch (error) {
+    console.error('Error navigating to report:', error)
+  } finally {
+    isLoading.value = false
+  }
 }
 
 /**
@@ -89,11 +106,20 @@ function promptDeleteReport(reportId) {
 /**
  * Deletes a report from the user's list after confirmation.
  */
-function confirmDeleteReport() {
+async function confirmDeleteReport() {
   if (reportToDeleteId.value !== null) {
-    reportsStore.deleteReport(reportToDeleteId.value)
+    try {
+      isDeleting.value = true
+      await reportsStore.deleteReport(reportToDeleteId.value)
+      showToast('Report deleted successfully', 'success')
+    } catch (error) {
+      console.error('Error deleting report:', error)
+      showToast('Failed to delete report', 'error')
+    } finally {
+      isDeleting.value = false
+      cancelDelete() // Close modal and reset state
+    }
   }
-  cancelDelete() // Close modal and reset state
 }
 
 /**
@@ -105,19 +131,40 @@ function cancelDelete() {
 }
 
 /**
- * Navigates to the questionnaire to retake a specific assessment.
- * @param {object} report The report object to retake.
+ * Continues a draft assessment from where the user left off.
+ * @param {object} report The draft report object to continue.
  */
-function retakeAssessment(report) {
-  router.push({ name: 'questionnaire', params: { type: report.type } })
+async function continueAssessment(report) {
+  try {
+    isLoading.value = true
+    // Load the draft into the assessment store
+    const draft = reportsStore.getDraftById(report.id)
+    if (draft) {
+      // Use a dedicated action to load the draft into the active state
+      assessmentStore.loadDraft(draft)
+      // Navigate to questionnaire with the draft type
+      await router.push({ name: 'questionnaire', params: { type: report.type } })
+    }
+  } catch (error) {
+    console.error('Error continuing assessment:', error)
+  } finally {
+    isLoading.value = false
+  }
 }
 
 /**
  * Navigates to the QuestionnairePage to initiate a new security assessment.
  */
-function startNewAssessment() {
-  // Navigate to the questionnaire page with a default assessment type
-  router.push({ name: 'questionnaire', params: { type: 'Standard ITIVA Assessment' } })
+async function startNewAssessment() {
+  try {
+    isLoading.value = true
+    // Navigate to the questionnaire page with a default assessment type
+    await router.push({ name: 'questionnaire', params: { type: 'Standard ITIVA Assessment' } })
+  } catch (error) {
+    console.error('Error starting new assessment:', error)
+  } finally {
+    isLoading.value = false
+  }
 }
 
 /**
@@ -130,59 +177,94 @@ function closeWelcomeModal() {
 /**
  * Navigates to the new LinkAccountsPage.
  */
-function goToLinkAccounts() {
-  router.push('/link-accounts')
-  showSettingsMenu.value = false // Close menu after navigation
+async function goToLinkAccounts() {
+  try {
+    isLoading.value = true
+    await router.push('/link-accounts')
+    showSettingsMenu.value = false // Close menu after navigation
+  } catch (error) {
+    console.error('Error navigating to link accounts:', error)
+  } finally {
+    isLoading.value = false
+  }
 }
 
 /**
  * Handles user logout.
  */
-function logout() {
-  console.log('User logged out.')
-  // In a real app, this would clear authentication tokens.
-  router.push('/')
-  authStore.logout() // Use the store's logout action
+async function logout() {
+  try {
+    isLoading.value = true
+    console.log('User logged out.')
+    showToast('Logging out...', 'info')
+    // In a real app, this would clear authentication tokens.
+    await router.push('/')
+    authStore.logout() // Use the store's logout action
+  } catch (error) {
+    console.error('Error during logout:', error)
+    showToast('Error during logout', 'error')
+  } finally {
+    isLoading.value = false
+  }
+}
+
+// Lifecycle hook to show welcome modal on first visit
+onMounted(() => {
+  // Check if this is the user's first visit to the dashboard
+  const hasVisited = localStorage.getItem('dashboard-visited')
+  if (!hasVisited) {
+    showWelcomeModal.value = true
+    localStorage.setItem('dashboard-visited', 'true')
+  }
+})
+
+/**
+ * Opens the system test panel.
+ */
+function openSystemTestPanel() {
+  showSystemTestPanel.value = true
+}
+
+/**
+ * Closes the system test panel.
+ */
+function closeSystemTestPanel() {
+  showSystemTestPanel.value = false
 }
 </script>
 
 <template>
   <!-- Main container for the dashboard page, with light gray background -->
+
   <div class="min-h-screen bg-gray-100 font-sans flex flex-col">
     <!-- The single, unified AppHeader is called here. -->
     <AppHeader :show-new-assessment="true" />
     <!-- Main Content Area: Centered, padded, responsive -->
     <main class="container mx-auto px-6 py-8 flex-grow">
-      <!-- Welcome Heading - uses authStore.userName -->
-      <h1 class="text-3xl font-bold text-gray-900 mb-6">Welcome, {{ authStore.userName }}!</h1>
+      <!-- Welcome Heading - uses authStore.userFullName for better display -->
+      <h1 class="text-3xl font-bold text-gray-900 mb-6">Welcome, {{ authStore.userFullName }}!</h1>
 
       <!-- Dashboard Overview Cards: Grid layout for key metrics -->
       <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
         <!-- Total Assessments Card -->
         <div class="bg-white rounded-lg shadow p-6 text-center">
           <h3 class="text-xl font-semibold text-gray-700 mb-2">Total Assessments</h3>
-          <p class="text-5xl font-extrabold text-blue-600">{{ reportsStore.userReports.length }}</p>
+          <p class="text-5xl font-extrabold text-blue-600">
+            {{ reportsStore.completedReports.length }}
+          </p>
         </div>
         <!-- Average Score Card -->
         <div class="bg-white rounded-lg shadow p-6 text-center">
           <h3 class="text-xl font-semibold text-gray-700 mb-2">Average Score</h3>
           <p class="text-5xl font-extrabold text-green-600">
-            {{
-              latestReportsByType.length > 0
-                ? (
-                    latestReportsByType.reduce((sum, r) => sum + r.score, 0) /
-                    latestReportsByType.length
-                  ).toFixed(1)
-                : 'N/A'
-            }}
+            {{ averageScore }}
           </p>
         </div>
-        <!-- Last Assessment Date Card -->
+        <!-- Draft Assessments Card -->
         <div class="bg-white rounded-lg shadow p-6 text-center">
-          <h3 class="text-xl font-semibold text-gray-700 mb-2">Last Assessment Date</h3>
-          <p class="text-2xl font-bold text-gray-600">
-            {{ reportsStore.userReports.length > 0 ? reportsStore.userReports[0].date : 'N/A' }}
-            <!-- Still uses first report for "last date" -->
+          <h3 class="text-xl font-semibold text-gray-700 mb-2">Draft Assessments</h3>
+          <p class="text-5xl font-extrabold text-yellow-600">
+            {{ reportsStore.draftReports.length }}
           </p>
         </div>
       </div>
@@ -234,10 +316,32 @@ function logout() {
                 <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                   <div class="flex items-center">
                     <span>{{ report.name }}</span>
+                    <!-- Draft indicator -->
+                    <span
+                      v-if="report.isDraft"
+                      class="ml-2 inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800"
+                    >
+                      <svg
+                        class="w-3 h-3 mr-1"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          stroke-width="2"
+                          d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                        ></path>
+                      </svg>
+                      Draft
+                    </span>
+                    <!-- Continue assessment button for drafts -->
                     <button
-                      @click="retakeAssessment(report)"
+                      v-if="report.isDraft"
+                      @click="continueAssessment(report)"
                       class="ml-2 text-gray-400 cursor-pointer hover:text-blue-600 transition-colors"
-                      title="Retake Assessment"
+                      title="Continue Assessment"
                     >
                       <svg
                         xmlns="http://www.w3.org/2000/svg"
@@ -250,7 +354,7 @@ function logout() {
                         <path
                           stroke-linecap="round"
                           stroke-linejoin="round"
-                          d="M4 4v5h5M20 20v-5h-5M4 4l1.5 1.5A9 9 0 0120.5 15M20 20l-1.5-1.5A9 9 0 003.5 9"
+                          d="M13 7l5 5m0 0l-5 5m5-5H6"
                         />
                       </svg>
                     </button>
@@ -260,38 +364,39 @@ function logout() {
                   {{ report.date }}
                 </td>
                 <td
+                  v-if="!report.isDraft"
                   class="px-6 py-4 whitespace-nowrap text-sm font-bold"
-                  :class="
-                    report.score > 75
-                      ? 'text-green-600'
-                      : report.score > 50
-                        ? 'text-yellow-600'
-                        : 'text-red-600'
-                  "
+                  :class="getScoreColorClass(report.score)"
                 >
                   {{ report.score }}
                 </td>
+                <td v-else class="px-6 py-4 whitespace-nowrap text-sm text-gray-400">--</td>
                 <td
+                  v-if="!report.isDraft"
                   class="px-6 py-4 whitespace-nowrap text-sm font-bold"
                   :class="getGradeColorClass(getGrade(report.score))"
                 >
                   {{ getGrade(report.score) }}
                 </td>
+                <td v-else class="px-6 py-4 whitespace-nowrap text-sm text-gray-400">--</td>
                 <td class="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
                   {{ report.type }}
                 </td>
                 <td class="px-4 py-4 whitespace-nowrap text-right text-sm font-medium">
                   <div class="flex items-center justify-end space-x-4">
+                    <!-- View Report button - only for completed reports -->
                     <button
+                      v-if="!report.isDraft"
                       @click="viewReport(report)"
                       class="text-blue-600 hover:text-blue-900 transition-colors duration-200 cursor-pointer"
                     >
                       View Report
                     </button>
+                    <!-- Delete button - available for both drafts and completed reports -->
                     <button
                       @click="promptDeleteReport(report.id)"
                       class="text-red-500 hover:text-red-700 cursor-pointer transition-colors"
-                      title="Delete Report"
+                      :title="report.isDraft ? 'Delete Draft' : 'Delete Report'"
                     >
                       <svg
                         xmlns="http://www.w3.org/2000/svg"
@@ -321,7 +426,7 @@ function logout() {
           </p>
           <button
             @click="startNewAssessment"
-            class="bg-blue-600 text-white font-semibold py-2 px-6 rounded-md hover:bg-blue-700 transition-colors duration-200"
+            class="bg-blue-600 cursor-pointer text-white font-semibold py-2 px-6 rounded-md hover:bg-blue-700 transition-colors duration-200"
           >
             Start New Assessment
           </button>
@@ -353,6 +458,29 @@ function logout() {
               ></path>
             </svg>
             <span class="text-lg font-medium text-blue-800">Start New Assessment</span>
+          </button>
+          <!-- Continue Draft Assessment Button - only show if there are drafts -->
+          <button
+            v-if="reportsStore.hasDrafts"
+            @click="continueAssessment(reportsStore.draftReports[0])"
+            class="flex flex-col cursor-pointer items-center justify-center p-6 bg-yellow-50 rounded-lg shadow-sm hover:bg-yellow-100 transition-colors duration-200"
+          >
+            <!-- Icon for Continue Assessment -->
+            <svg
+              class="w-12 h-12 text-yellow-600 mb-3"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="1.5"
+                d="M13 7l5 5m0 0l-5 5m5-5H6"
+              ></path>
+            </svg>
+            <span class="text-lg font-medium text-yellow-800">Continue Draft</span>
           </button>
           <!-- Manage Settings Button (now handled by dropdown) -->
           <button
@@ -404,6 +532,29 @@ function logout() {
             </svg>
             <span class="text-lg font-medium text-red-800">Logout</span>
           </button>
+
+          <!-- System Test Panel Button (for development/testing) -->
+          <button
+            @click="openSystemTestPanel"
+            class="flex flex-col cursor-pointer items-center justify-center p-6 bg-purple-50 rounded-lg shadow-sm hover:bg-purple-100 transition-colors duration-200"
+          >
+            <!-- Icon for System Test -->
+            <svg
+              class="w-12 h-12 text-purple-600 mb-3"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="1.5"
+                d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+              ></path>
+            </svg>
+            <span class="text-lg font-medium text-purple-800">System Test</span>
+          </button>
         </div>
       </section>
     </main>
@@ -443,7 +594,7 @@ function logout() {
           <h3 class="text-3xl font-bold text-blue-600 mb-4">Welcome Back!</h3>
           <!-- Modal Body Text -->
           <p class="text-gray-700 mb-6">
-            We're glad to see you again, {{ authStore.userName }}. Dive into your dashboard to
+            We're glad to see you again, {{ authStore.userFullName }}. Dive into your dashboard to
             manage your IT vulnerability assessments.
           </p>
           <!-- Get Started Button to close the modal -->
@@ -456,55 +607,61 @@ function logout() {
         </div>
       </div>
     </transition>
-  </div>
 
-  <!-- Delete Confirmation Modal -->
-  <transition name="fade">
-    <div
-      v-if="showDeleteConfirmModal"
-      class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-4 z-50"
-    >
-      <div class="bg-white rounded-lg shadow-xl p-6 max-w-md w-full relative">
-        <button
-          @click="cancelDelete"
-          class="absolute top-3 right-3 text-gray-400 hover:text-gray-600 transition-colors"
-        >
-          <svg
-            class="w-6 h-6"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-            xmlns="http://www.w3.org/2000/svg"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M6 18L18 6M6 6l12 12"
-            ></path>
-          </svg>
-        </button>
-        <h3 class="text-xl font-bold text-gray-800 mb-4">Confirm Deletion</h3>
-        <p class="text-gray-600 mb-6">
-          Are you sure you want to delete this report? This action cannot be undone.
-        </p>
-        <div class="flex justify-end space-x-4">
+    <!-- System Test Panel -->
+    <SystemTestPanel :show="showSystemTestPanel" @close="closeSystemTestPanel" />
+
+    <!-- Delete Confirmation Modal -->
+    <transition name="fade">
+      <div
+        v-if="showDeleteConfirmModal"
+        class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-4 z-50"
+      >
+        <div class="bg-white rounded-lg shadow-xl p-6 max-w-md w-full relative">
           <button
             @click="cancelDelete"
-            class="px-6 py-2 cursor-pointer font-semibold text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 transition-colors"
+            class="absolute top-3 right-3 text-gray-400 hover:text-gray-600 transition-colors"
           >
-            Cancel
+            <svg
+              class="w-6 h-6"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M6 18L18 6M6 6l12 12"
+              ></path>
+            </svg>
           </button>
-          <button
-            @click="confirmDeleteReport"
-            class="px-6 py-2 cursor-pointer font-semibold text-white bg-red-600 rounded-md hover:bg-red-700 transition-colors"
-          >
-            Delete
-          </button>
+          <h3 class="text-xl font-bold text-gray-800 mb-4">Confirm Deletion</h3>
+          <p class="text-gray-600 mb-6">
+            Are you sure you want to delete this
+            {{
+              reportToDeleteId && reportsStore.getDraftById(reportToDeleteId) ? 'draft' : 'report'
+            }}? This action cannot be undone.
+          </p>
+          <div class="flex justify-end space-x-4">
+            <button
+              @click="cancelDelete"
+              class="px-6 py-2 cursor-pointer font-semibold text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              @click="confirmDeleteReport"
+              class="px-6 py-2 cursor-pointer font-semibold text-white bg-red-600 rounded-md hover:bg-red-700 transition-colors"
+            >
+              Delete
+            </button>
+          </div>
         </div>
       </div>
-    </div>
-  </transition>
+    </transition>
+  </div>
 </template>
 
 <style scoped>

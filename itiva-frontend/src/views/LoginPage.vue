@@ -21,6 +21,11 @@ const lastName = ref('') // For registration
 const registrationUserName = ref('') // For registration
 const email = ref('') // For registration
 
+// Password visibility states
+const showPassword = ref(false)
+const showConfirmPassword = ref(false)
+const showLoginPassword = ref(false)
+
 const errorMessage = ref('') // To display form errors
 
 // Reactive property to control which tab is active: 'login' or 'register'
@@ -80,31 +85,72 @@ function selectBusinessType(type) {
 }
 
 /**
- * Handles the login attempt.
- * Currently uses hardcoded credentials for demonstration purposes.
- * In a real application, this would make an API call to your backend.
+ * Generates a strong password suggestion using Google's password strength guidelines
  */
-function handleLogin() {
+function generateStrongPassword() {
+  const lowercase = 'abcdefghijklmnopqrstuvwxyz'
+  const uppercase = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+  const numbers = '0123456789'
+  const symbols = '!@#$%^&*()_+-=[]{}|;:,.<>?'
+
+  let password = ''
+
+  // Ensure at least one character from each category
+  password += lowercase[Math.floor(Math.random() * lowercase.length)]
+  password += uppercase[Math.floor(Math.random() * uppercase.length)]
+  password += numbers[Math.floor(Math.random() * numbers.length)]
+  password += symbols[Math.floor(Math.random() * symbols.length)]
+
+  // Fill the rest with random characters
+  const allChars = lowercase + uppercase + numbers + symbols
+  for (let i = 4; i < 12; i++) {
+    password += allChars[Math.floor(Math.random() * allChars.length)]
+  }
+
+  // Shuffle the password
+  password = password
+    .split('')
+    .sort(() => Math.random() - 0.5)
+    .join('')
+
+  return password
+}
+
+/**
+ * Suggests a strong password and fills both password fields
+ */
+function suggestStrongPassword() {
+  const suggestedPassword = generateStrongPassword()
+  password.value = suggestedPassword
+  confirmPassword.value = suggestedPassword
+}
+
+/**
+ * Handles the login attempt using the new user management system.
+ */
+async function handleLogin() {
   errorMessage.value = '' // Clear previous error messages
 
-  // Hardcoded credentials for demonstration
-  if (username.value === 'user' && password.value === 'password') {
-    // For testing, simulate auth state for a regular user
-    authStore.setLoginState(true, false, 'John Doe')
-    router.push('/dashboard') // Navigate to the user dashboard on success
-  } else if (username.value === 'admin' && password.value === 'admin') {
-    // For testing, simulate auth state for an admin user
-    // Note: The admin dashboard doesn't use this state yet, but we set it for consistency.
-    authStore.setLoginState(true, true, 'Admin User')
-    router.push('/admin/dashboard') // Navigate to the admin dashboard on admin login
-  } else {
-    errorMessage.value = 'Invalid username or password.' // Display error for invalid credentials
+  try {
+    // Use the new login system, which can throw an error
+    const response = await authStore.login(username.value, password.value)
+
+    // *** FIX: Check the 'isAdmin' property on the nested user object ***
+    if (response && response.success) {
+      if (response.user.isAdmin) {
+        router.push('/admin/dashboard')
+      } else {
+        router.push('/dashboard')
+      }
+    }
+  } catch (error) {
+    console.error('Login failed:', error.message) // Log the specific error for developers
+    errorMessage.value = 'Invalid username or password.' // Show a generic message to the user
   }
 }
 
 /**
- * Handles the registration attempt.
- * This is a placeholder; in a real app, it would send data to a backend.
+ * Handles the registration attempt using the new user management system.
  */
 function handleRegister() {
   errorMessage.value = '' // Clear previous error messages
@@ -125,34 +171,44 @@ function handleRegister() {
     errorMessage.value = 'Passwords do not match.'
     return
   }
-  if (password.value.length < 6) {
-    errorMessage.value = 'Password must be at least 6 characters long.'
+  if (password.value.length < 8) {
+    errorMessage.value = 'Password must be at least 8 characters long.'
     return
   }
-  // Add more comprehensive validation for other fields if needed
 
-  // Simulate registration logic (e.g., API call)
-  console.log('Attempting to register user:', {
+  // Check if user already exists
+  const existingUser = authStore.users.find(
+    (u) => u.email === email.value || u.username === registrationUserName.value,
+  )
+
+  if (existingUser) {
+    errorMessage.value = 'A user with this email or username already exists.'
+    return
+  }
+
+  // Create user data object
+  const userData = {
+    username: registrationUserName.value || email.value.split('@')[0],
+    password: password.value,
+    firstName: firstName.value,
+    lastName: lastName.value,
+    email: email.value,
     companyName: companyName.value,
     companyDescription: companyDescription.value,
     address: address.value,
     city: city.value,
     businessType: businessType.value,
-    firstName: firstName.value,
-    lastName: lastName.value,
-    registrationUserName: registrationUserName.value,
-    email: email.value,
-    password: password.value, // In a real app, send hashed password
-  })
+    isAdmin: false,
+  }
 
-  // Simulate success
-  errorMessage.value = '' // Clear any error message
-
-  // For testing purposes, we'll store a simulated auth state in sessionStorage.
-  // Use Pinia store instead of sessionStorage
-  authStore.setLoginState(true, false, `${firstName.value} ${lastName.value}` || 'New User')
-
-  router.push('/dashboard') // Redirect to the dashboard
+  try {
+    // Register the user using the new system
+    authStore.register(userData)
+    router.push('/dashboard')
+  } catch (error) {
+    errorMessage.value = 'Registration failed. Please try again.'
+    console.error('Registration error:', error)
+  }
 }
 
 /**
@@ -175,6 +231,10 @@ function switchTab(tab) {
   lastName.value = ''
   registrationUserName.value = ''
   email.value = ''
+  // Reset password visibility
+  showPassword.value = false
+  showConfirmPassword.value = false
+  showLoginPassword.value = false
 }
 </script>
 
@@ -189,7 +249,7 @@ function switchTab(tab) {
     <!-- ITIVA Logo/Link at the top, styled like the company icon, links to homepage -->
     <!-- Max-w-md for max width on larger screens, mx-auto for centering, mb-8 for margin-bottom.
              Flex for inner alignment, rounded-lg and shadow-sm for styling. -->
-    <RouterLink to="/" class="cursor-pointer text-3xl font-bold text-gray-800">
+    <RouterLink to="/" class="cursor-pointer text-3xl font-bold text-gray-800 mb-6 inline-block">
       IT<span class="text-blue-600">I</span>VA
     </RouterLink>
 
@@ -240,7 +300,7 @@ function switchTab(tab) {
             <form class="space-y-6" @submit.prevent="handleLogin">
               <div>
                 <label for="login-username" class="block text-sm font-medium text-gray-700">
-                  Username
+                  Username or Email
                 </label>
                 <div class="mt-1">
                   <input
@@ -259,16 +319,56 @@ function switchTab(tab) {
                 <label for="login-password" class="block text-sm font-medium text-gray-700">
                   Password
                 </label>
-                <div class="mt-1">
+                <div class="mt-1 relative">
                   <input
                     id="login-password"
                     name="password"
-                    type="password"
+                    :type="showLoginPassword ? 'text' : 'password'"
                     autocomplete="current-password"
                     required
                     v-model="password"
-                    class="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                    class="appearance-none block w-full px-3 py-2 pr-10 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                   />
+                  <button
+                    type="button"
+                    @click="showLoginPassword = !showLoginPassword"
+                    class="absolute inset-y-0 right-0 pr-3 flex items-center cursor-pointer"
+                  >
+                    <svg
+                      v-if="showLoginPassword"
+                      class="h-5 w-5 text-gray-400 hover:text-gray-600"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                        d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878L21 21"
+                      />
+                    </svg>
+                    <svg
+                      v-else
+                      class="h-5 w-5 text-gray-400 hover:text-gray-600"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                        d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                      />
+                      <path
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                        d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+                      />
+                    </svg>
+                  </button>
                 </div>
               </div>
 
@@ -302,7 +402,7 @@ function switchTab(tab) {
                 <div>
                   <a
                     href="#"
-                    class="w-full cursor-pointer flex items-center justify-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+                    class="w-full cursor-pointer flex items-center justify-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors"
                   >
                     <!-- Google Icon SVG (with full color) -->
                     <svg
@@ -342,7 +442,7 @@ function switchTab(tab) {
                 <div>
                   <a
                     href="#"
-                    class="w-full cursor-pointer flex items-center justify-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+                    class="w-full cursor-pointer flex items-center justify-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors"
                   >
                     <!-- Facebook Icon SVG (with actual blue color) -->
                     <svg
@@ -499,6 +599,7 @@ function switchTab(tab) {
                 id="contact-person"
                 name="registrationUserName"
                 type="text"
+                autocomplete="username"
                 v-model="registrationUserName"
                 placeholder="e.g., john.doe"
                 class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
@@ -520,36 +621,130 @@ function switchTab(tab) {
               />
             </div>
 
-            <!-- Password Fields -->
+            <!-- Password Fields with Google Suggestions -->
             <div>
               <label for="register-password" class="block text-sm font-medium text-gray-700">
                 Password <span class="text-red-500">*</span>
               </label>
-              <input
-                id="register-password"
-                name="password"
-                type="password"
-                autocomplete="new-password"
-                v-model="password"
-                required
-                placeholder="e.g., SecureP@ssw0rd"
-                class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-              />
+              <div class="mt-1 relative">
+                <input
+                  id="register-password"
+                  name="password"
+                  :type="showPassword ? 'text' : 'password'"
+                  autocomplete="new-password"
+                  v-model="password"
+                  required
+                  placeholder="e.g., SecureP@ssw0rd"
+                  class="block w-full px-3 py-2 pr-20 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                />
+                <div class="absolute inset-y-0 right-0 flex items-center pr-2">
+                  <button
+                    type="button"
+                    @click="suggestStrongPassword"
+                    class="text-blue-600 cursor-pointer hover:text-blue-800 text-xs font-medium mr-2"
+                    title="Suggest strong password"
+                  >
+                    Suggest
+                  </button>
+                  <button
+                    type="button"
+                    @click="showPassword = !showPassword"
+                    class="text-gray-400 hover:text-gray-600"
+                  >
+                    <svg
+                      v-if="showPassword"
+                      class="h-5 w-5"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                        d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878L21 21"
+                      />
+                    </svg>
+                    <svg
+                      v-else
+                      class="h-5 w-5 cursor-pointer"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                        d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                      />
+                      <path
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                        d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+                      />
+                    </svg>
+                  </button>
+                </div>
+              </div>
             </div>
             <div>
               <label for="confirm-password" class="block text-sm font-medium text-gray-700">
                 Confirm Password <span class="text-red-500">*</span>
               </label>
-              <input
-                id="confirm-password"
-                name="confirmPassword"
-                type="password"
-                autocomplete="new-password"
-                v-model="confirmPassword"
-                required
-                placeholder="e.g., SecureP@ssw0rd"
-                class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-              />
+              <div class="mt-1 relative">
+                <input
+                  id="confirm-password"
+                  name="confirmPassword"
+                  :type="showConfirmPassword ? 'text' : 'password'"
+                  autocomplete="new-password"
+                  v-model="confirmPassword"
+                  required
+                  placeholder="e.g., SecureP@ssw0rd"
+                  class="block w-full px-3 py-2 pr-10 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                />
+                <button
+                  type="button"
+                  @click="showConfirmPassword = !showConfirmPassword"
+                  class="absolute inset-y-0 right-0 pr-3 flex items-center cursor-pointer"
+                >
+                  <svg
+                    v-if="showConfirmPassword"
+                    class="h-5 w-5 text-gray-400 hover:text-gray-600 cursor-pointer"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878L21 21"
+                    />
+                  </svg>
+                  <svg
+                    v-else
+                    class="h-5 w-5 text-gray-400 hover:text-gray-600"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                    />
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+                    />
+                  </svg>
+                </button>
+              </div>
             </div>
 
             <div v-if="errorMessage" class="text-red-600 text-sm text-center">

@@ -78,4 +78,44 @@ const router = createRouter({
   },
 })
 
+// // Global navigation guard to handle draft saving
+// router.beforeEach(async (to, from, next) => {
+//   // Check if user is navigating away from questionnaire page
+//   if (from.name === 'questionnaire') {
+//     try {
+//       // Dynamically import stores to avoid circular dependencies
+//       const { useAssessmentStore } = await import('@/stores/assessment')
+//       const { useReportsStore } = await import('@/stores/reports')
+
+//       const assessmentStore = useAssessmentStore()
+//       const reportsStore = useReportsStore()
+
+//       // Check if there's an active draft
+//       if (assessmentStore.hasActiveDraft && assessmentStore.isDraftMode) {
+//         // Store the target route for later navigation
+//         const targetRoute = to.fullPath
+
+//         // Create a custom event to trigger the draft save modal
+//         const draftSaveEvent = new CustomEvent('show-draft-save-modal', {
+//           detail: {
+//             targetRoute,
+//             assessmentStore,
+//             reportsStore,
+//           },
+//         })
+
+//         // Dispatch the event
+//         window.dispatchEvent(draftSaveEvent)
+
+//         // Prevent immediate navigation
+//         return false
+//       }
+//     } catch (error) {
+//       console.error('Error in navigation guard:', error)
+//     }
+//   }
+
+//   next()
+// })
+
 export default router
