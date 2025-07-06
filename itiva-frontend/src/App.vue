@@ -1,13 +1,16 @@
 <!-- src/App.vue - Updated to manage global header/footer visibility and notification -->
 <script setup>
-import { computed, ref, provide } from 'vue'
+import { computed, ref, provide, onMounted } from 'vue'
 import { useRoute, RouterView } from 'vue-router'
-// import { useAuthStore } from './stores/auth' // Import the auth store
+import { useAuthStore } from './stores/auth'
+import { useReportsStore } from './stores/reports'
 import AppHeader from './components/AppHeader.vue' // Global header component
 import AppFooter from './components/AppFooter.vue' // Global footer component
 import ToastNotification from '@/components/ToastNotification.vue'
 
 const route = useRoute()
+const authStore = useAuthStore()
+const reportsStore = useReportsStore()
 
 // Reactive state for global notifications
 const toast = ref({
@@ -34,6 +37,15 @@ function hideToast() {
 // Provide toast functions globally
 provide('showToast', showToast)
 provide('hideToast', hideToast)
+
+// This onMounted hook is critical for correct application startup.
+onMounted(() => {
+  // 1. Check auth status first to identify the current user.
+  authStore.checkAuthStatus()
+  // 2. Load all reports from storage. The reportsStore's computed properties
+  //    will now automatically filter this data for the identified user.
+  reportsStore.loadReportsFromStorage()
+})
 
 /**
  * Computed property to determine if the global Header and Footer should be shown.

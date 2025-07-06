@@ -1,16 +1,27 @@
 <script setup>
 import { ref, onMounted, onBeforeUnmount, computed, nextTick } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import jsPDF from 'jspdf'
-import html2canvas from 'html2canvas'
+import { applyPlugin } from 'jspdf-autotable'
 import Chart from 'chart.js/auto'
 import AppHeader from '@/components/AppHeader.vue'
 import AppFooter from '@/components/AppFooter.vue'
 import { useAssessmentStore } from '@/stores/assessment'
+import { useReportsStore } from '@/stores/reports'
+import { useAuthStore } from '@/stores/auth'
 import DownloadIcon from '@/components/icons/DownloadIcon.vue'
 import BackIcon from '@/components/icons/BackIcon.vue'
+import html2canvas from 'html2canvas'
+
+// Apply the autotable plugin to the jsPDF constructor
+applyPlugin(jsPDF)
 
 const router = useRouter()
+const route = useRoute()
+
+// --- Store Initialization ---
+const assessmentStore = useAssessmentStore()
+const reportsStore = useReportsStore()
 
 // --- State and Data ---
 const reportData = ref(null)
@@ -18,7 +29,11 @@ const summary = ref('')
 const isLoadingSummary = ref(true)
 const isDownloading = ref(false)
 let radarChartInstance = null
-const assessmentStore = useAssessmentStore()
+let pdfRadarChartInstance = null // Add instance tracker for the PDF chart
+const authStore = useAuthStore()
+
+// --- PDF Generation Refs ---
+const fullReportForPdf = ref(null) // Ref to the hidden, full-report element for PDF generation
 
 // --- Default/Mock Data Structure (matching the reference) ---
 const defaultReport = {
@@ -88,14 +103,21 @@ const goBack = () => {
 }
 
 // --- Charting ---
-function createOrUpdateChart(data) {
-  const ctx = document.getElementById('reportRadarChart')
+function createOrUpdateChart(data, canvasId = 'reportRadarChart') {
+  const ctx = document.getElementById(canvasId)
   if (!ctx || !ctx.getContext) return
 
-  if (radarChartInstance) radarChartInstance.destroy()
+  // Destroy the correct chart instance before recreating
+  if (canvasId === 'reportRadarChart' && radarChartInstance) {
+    radarChartInstance.destroy()
+  }
+  if (canvasId === 'pdfRadarChart' && pdfRadarChartInstance) {
+    pdfRadarChartInstance.destroy()
+  }
 
   const { scores } = data
-  radarChartInstance = new Chart(ctx, {
+  // radarChartInstance = new Chart(ctx, {
+  const chart = new Chart(ctx, {
     type: 'radar',
     data: {
       labels: ['Website', 'Network', 'Compliance', 'CyberSec'],
@@ -109,111 +131,494 @@ function createOrUpdateChart(data) {
       ],
     },
     options: {
+      animation: canvasId === 'pdfRadarChart' ? false : undefined, // Disable animation for PDF capture
       // Add willReadFrequently hint for performance
       context: ctx.getContext('2d', { willReadFrequently: true }),
       maintainAspectRatio: false,
-      scales: { r: { suggestedMin: 0, suggestedMax: 100, pointLabels: { font: { size: 14 } } } },
+      scales: {
+        r: {
+          suggestedMin: 0,
+          suggestedMax: 100,
+          pointLabels: { font: { size: canvasId === 'pdfRadarChart' ? 18 : 14 } },
+        },
+      },
       plugins: { legend: { display: false } },
     },
   })
+
+  // Only store the main chart instance.
+  if (canvasId === 'reportRadarChart') {
+    radarChartInstance = chart
+  } else if (canvasId === 'pdfRadarChart') {
+    pdfRadarChartInstance = chart
+  }
 }
 
-// --- PDF Download (Preserving the working version) ---
+/**
+ * Creates a configuration object for html2canvas to handle modern CSS color functions.
+ */
+const getPdfCanvasOptions = () => ({
+  scale: 2, // Use scale 2 for a good balance of quality and file size.
+  useCORS: true,
+  backgroundColor: '#ffffff',
+  onclone: (clonedDoc) => {
+    const style = clonedDoc.createElement('style')
+    // This is a comprehensive style override to combat the "oklch" color parsing error.
+    // It covers all known color classes used in the app and sets safe defaults.
+    style.innerHTML = `
+      /* --- Universal Resets for PDF --- */
+      * {
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+        color-adjust: exact !important;
+        box-shadow: none !important;
+      }
+      body, html {
+        background-color: #ffffff !important;
+        color: #111827 !important; /* Default text to gray-900 */
+      }
+
+      /* --- Background Colors --- */
+      .bg-white { background-color: #ffffff !important; }
+      .bg-slate-800, .bg-gray-800 { background-color: #1f2937 !important; }
+      .bg-gray-600 { background-color: #4b5563 !important; }
+      .bg-gray-200 { background-color: #e5e7eb !important; }
+      .bg-gray-100 { background-color: #f3f4f6 !important; }
+      .bg-gray-50 { background-color: #f9fafb !important; }
+      .bg-blue-600 { background-color: #2563eb !important; }
+      .bg-blue-500 { background-color: #3b82f6 !important; }
+      .bg-blue-100 { background-color: #dbeafe !important; }
+      .bg-blue-50 { background-color: #eff6ff !important; }
+      .bg-green-600 { background-color: #16a34a !important; }
+      .bg-green-500 { background-color: #22c55e !important; }
+      .bg-green-50 { background-color: #f0fdf4 !important; }
+      .bg-yellow-500 { background-color: #eab308 !important; }
+      .bg-yellow-100 { background-color: #fef9c3 !important; }
+      .bg-yellow-50 { background-color: #fefce8 !important; }
+      .bg-red-600 { background-color: #dc2626 !important; }
+      .bg-red-500 { background-color: #ef4444 !important; }
+      .bg-red-50 { background-color: #fef2f2 !important; }
+      .bg-purple-50 { background-color: #f5f3ff !important; }
+
+      /* --- Text Colors --- */
+      .text-white { color: #ffffff !important; }
+      .text-gray-900 { color: #111827 !important; }
+      .text-gray-800 { color: #1f2937 !important; }
+      .text-gray-700 { color: #374151 !important; }
+      .text-gray-600 { color: #4b5563 !important; }
+      .text-gray-500 { color: #6b7280 !important; }
+      .text-gray-300 { color: #d1d5db !important; }
+      .text-blue-800 { color: #1e40af !important; }
+      .text-blue-700 { color: #1d4ed8 !important; }
+      .text-blue-600 { color: #2563eb !important; }
+      .text-green-800 { color: #166534 !important; }
+      .text-green-600 { color: #16a34a !important; }
+      .text-yellow-800 { color: #854d0e !important; }
+      .text-yellow-600 { color: #ca8a04 !important; }
+      .text-red-800 { color: #991b1b !important; }
+      .text-red-600 { color: #dc2626 !important; }
+      .text-red-500 { color: #ef4444 !important; }
+      .text-purple-800 { color: #6b21a8 !important; }
+      .text-emerald-600 { color: #059669 !important; }
+      .text-orange-600 { color: #ea580c !important; }
+
+      /* --- Border Colors --- */
+      .border, .border-b, .border-t, .border-l, .border-r { border-color: #e5e7eb !important; }
+      .border-gray-200 { border-color: #e5e7eb !important; }
+      .border-gray-300 { border-color: #d1d5db !important; }
+      .border-blue-600 { border-color: #2563eb !important; }
+      .border-blue-500 { border-color: #3b82f6 !important; }
+    `
+    clonedDoc.head.appendChild(style)
+  },
+})
+
+/**
+ * Handles the PDF download process with manual pagination to prevent cut-off content.
+ */
 async function downloadReportAsPDF() {
-  const reportElement = document.getElementById('report-content')
-  if (!reportElement || isDownloading.value) return
-
+  if (isDownloading.value) return
   isDownloading.value = true
-  document.body.classList.add('pdf-capture-active')
-  await nextTick()
+  const sourceNode = fullReportForPdf.value
+
+  // Store original width to restore it later
+  const originalWidth = sourceNode.style.width
+
   try {
-    const canvas = await html2canvas(reportElement, {
-      scale: 2,
-      useCORS: true,
-      backgroundColor: '#ffffff',
-      onclone: (clonedDoc) => {
-        // This callback allows us to modify the cloned document before it's rendered.
-        // We inject a style block to override Tailwind's modern color functions (like oklch)
-        // with basic hex codes that html2canvas can parse reliably.
-        // Also hide buttons and apply table styling for PDF.
-        const style = clonedDoc.createElement('style')
-        style.innerHTML = `
-          /* Make the off-screen elements visible and part of the layout for the PDF */
-          .pdf-only { display: table-row-group !important; position: static !important; visibility: visible !important; }
-          .pdf-hide { display: none !important; } /* Hide buttons during PDF capture */
-            /* Enforce consistent table layout for the PDF */
-          table { table-layout: fixed !important; width: 100% !important; }
-          table th:first-child, table td:first-child { width: 60% !important; }
-          table th:nth-child(2), table td:nth-child(2) { width: 25% !important; }
-          table th:last-child, table td:last-child { width: 15% !important; }
-          th, td { word-wrap: break-word; }
-          tr { page-break-inside: avoid !important; } /* Attempt to prevent rows from splitting */
-          .border-b { border-bottom-color: #e5e7eb !important; } /* Use a safe default border color */
-          .bg-slate-800 { background-color: #1e293b !important; }
-          .text-gray-300 { color: #d1d5db !important; }
-          .bg-gray-600 { background-color: #4b5563 !important; }
-          .bg-blue-600 { background-color: #2563eb !important; }
-          .text-gray-800 { color: #1f2937 !important; }
-          .border-blue-600 { border-color: #2563eb !important; }
-          .text-gray-600 { color: #4b5563 !important; }
-          .bg-gray-100 { background-color: #f3f4f6 !important; }
-          .text-gray-700 { color: #374151 !important; }
-          .bg-gray-200 { background-color: #e5e7eb !important; } /* For table header */
-          .bg-gray-500 { background-color: #6b7280 !important; } /* For category tags */
-          .text-green-600 { color: #16a34a !important; }
-          .text-red-600 { color: #dc2626 !important; }
-        `
-        clonedDoc.head.appendChild(style)
-      },
-    })
-    const imgData = canvas.toDataURL('image/png')
-    const pdf = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' })
-    const pdfWidth = pdf.internal.pageSize.getWidth()
-    const imgProps = pdf.getImageProperties(imgData)
-    const imgHeight = (imgProps.height * pdfWidth) / imgProps.width
-    let position = 0
-    let heightLeft = imgHeight
-
-    pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, imgHeight)
-    heightLeft -= pdf.internal.pageSize.getHeight()
-
-    while (heightLeft > 0) {
-      position = heightLeft - imgHeight
-      pdf.addPage()
-      pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, imgHeight)
-      heightLeft -= pdf.internal.pageSize.getHeight()
+    if (!sourceNode) {
+      console.error('PDF source element not found.')
+      return
     }
-    const fileName = `ITIVA_Report_${reportData.value.name || 'General'}.pdf`
-    pdf.save(fileName)
+
+    sourceNode.style.visibility = 'visible'
+    // Set a fixed, wide width on the source element. This forces the browser to
+    // render the content at a higher resolution, which results in much crisper
+    // text in the final PDF after scaling. 1200px is a good balance.
+    sourceNode.style.width = '1200px'
+    sourceNode.style.display = 'block'
+
+    createOrUpdateChart(reportData.value, 'pdfRadarChart')
+    await nextTick()
+
+    const pdf = new jsPDF({ orientation: 'p', unit: 'pt', format: 'a4' })
+    const pdfWidth = pdf.internal.pageSize.getWidth()
+    const margin = 40
+
+    // Set a default font family for the entire document
+    // The 'sans-serif' style is not valid. Setting the font name to 'helvetica'
+    // correctly selects the standard, built-in sans-serif font.
+    pdf.setFont('helvetica')
+    let y = 0
+
+    // Helper to convert hex to RGB for jsPDF
+    const hexToRgb = (hex) => {
+      const r = parseInt(hex.slice(1, 3), 16)
+      const g = parseInt(hex.slice(3, 5), 16)
+      const b = parseInt(hex.slice(5, 7), 16)
+      return [r, g, b]
+    }
+
+    function drawMixedStyleText(doc, segments, x, y, maxWidth, fontSize, lineHeightFactor) {
+      let currentY = y
+      doc.setFontSize(fontSize)
+      doc.setLineHeightFactor(lineHeightFactor)
+      const lineHeight = fontSize * lineHeightFactor
+      const spaceWidth = doc.getStringUnitWidth(' ') * fontSize
+
+      let line = [] // To hold words for the current line: { text: 'word', width: 10, bold: true }
+      let lineWordsWidth = 0
+
+      // Flatten all segments into a single array of word objects
+      const allWords = []
+      segments.forEach((segment) => {
+        if (segment.text === '\n\n') {
+          allWords.push({ text: '\n\n', bold: false })
+          return
+        }
+        const words = segment.text.split(/\s+/)
+        words.forEach((word) => {
+          if (word) {
+            allWords.push({ text: word, bold: segment.bold })
+          }
+        })
+      })
+
+      // Function to draw a single line of text, with or without justification
+      const drawLine = (currentLine, justify) => {
+        if (currentLine.length === 0) return
+
+        const totalWordsWidth = currentLine.reduce((acc, word) => acc + word.width, 0)
+        const totalSpaces = currentLine.length - 1
+        let spaceBetweenWords = spaceWidth
+
+        if (justify && totalSpaces > 0) {
+          const remainingSpace = maxWidth - totalWordsWidth
+          spaceBetweenWords = remainingSpace / totalSpaces
+        }
+
+        let currentX = x
+        currentLine.forEach((word) => {
+          doc.setFont(undefined, word.bold ? 'bold' : 'normal')
+          doc.text(word.text, currentX, currentY)
+          currentX += word.width + spaceBetweenWords
+        })
+        currentY += lineHeight
+      }
+
+      // Process all words, building and drawing lines
+      allWords.forEach((wordObj) => {
+        if (wordObj.text === '\n\n') {
+          drawLine(line, false) // Draw the last line before paragraph break (no justify)
+          currentY += lineHeight // Add extra space for paragraph break
+          line = []
+          lineWordsWidth = 0
+          return
+        }
+
+        doc.setFont(undefined, wordObj.bold ? 'bold' : 'normal')
+        const wordWidth = doc.getStringUnitWidth(wordObj.text) * fontSize
+
+        // This is the crucial fix: Calculate the prospective width of the line *with* all spaces.
+        const prospectiveLineWidth = lineWordsWidth + wordWidth + line.length * spaceWidth
+
+        if (line.length > 0 && prospectiveLineWidth > maxWidth) {
+          drawLine(line, false) // Draw the full line left-aligned
+          line = []
+          lineWordsWidth = 0
+        }
+
+        line.push({ text: wordObj.text, width: wordWidth, bold: wordObj.bold })
+        lineWordsWidth += wordWidth
+      })
+
+      drawLine(line, false) // Draw the last remaining line (no justify)
+
+      return currentY // Return the Y position for the *next* element
+    }
+
+    // --- 1. Manually construct the first page ---
+
+    // Header
+    const headerHeight = 100
+    pdf.setFillColor('#1f2937') // slate-800
+    pdf.rect(0, 0, pdfWidth, headerHeight, 'F')
+
+    y = 38
+    pdf.setFontSize(22)
+    pdf.setFont(undefined, 'bold')
+    pdf.setTextColor('#FFFFFF')
+    pdf.text(reportTitle.value, margin, y)
+
+    y += 22
+    pdf.setFontSize(11)
+    pdf.setFont(undefined, 'normal')
+    pdf.setTextColor('#d1d5db') // gray-300
+
+    // Manually construct the "Generated..." line to bold a part of it
+    const generatedText = `Generated `
+    const reportNameText = `${reportData.value.name} Report`
+    const restOfText = ` on ${generatedDate.value} by ITIVA`
+    pdf.text(generatedText, margin, y)
+    const generatedTextWidth = pdf.getStringUnitWidth(generatedText) * pdf.getFontSize()
+    pdf.setFont(undefined, 'bold')
+    pdf.text(reportNameText, margin + generatedTextWidth, y)
+    const reportNameWidth = pdf.getStringUnitWidth(reportNameText) * pdf.getFontSize()
+    pdf.setFont(undefined, 'normal')
+    pdf.text(restOfText, margin + generatedTextWidth + reportNameWidth, y)
+
+    y += 18
+    pdf.text(`For: ${authStore.currentUser?.companyName || 'Your Business'}`, margin, y)
+
+    // Main Content
+    y = headerHeight + 40
+
+    // Executive Summary
+    pdf.setFontSize(16)
+    pdf.setFont(undefined, 'bold')
+    pdf.setTextColor('#1f2937') // gray-800
+    pdf.text('Executive Summary', margin, y)
+    y += 30
+
+    pdf.setTextColor('#4b5563') // gray-600
+    const { name, scores, recommendations } = reportData.value
+    const topRecText =
+      recommendations.length > 0
+        ? `${recommendations[0].category}`
+        : 'maintaining current security standards'
+
+    const summarySegments = [
+      {
+        text: 'This executive summary provides a high-level overview of the IT infrastructure vulnerability assessment conducted for ',
+        bold: false,
+      },
+      { text: name, bold: true },
+      { text: '. The overall security score of ', bold: false },
+      { text: String(scores.overall), bold: true },
+      {
+        text: ' places the organization in a position with foundational security measures in place but highlights critical areas requiring immediate attention to mitigate significant risks.',
+        bold: false,
+      },
+      { text: '\n\n', bold: false },
+      { text: 'The assessment reveals a notable strength in the ', bold: false },
+      { text: 'Devices & Network', bold: true },
+      { text: ' category, scoring ', bold: false },
+      { text: String(scores.dn), bold: true },
+      {
+        text: '. This indicates that core network security and device management protocols are relatively robust. However, this strength is contrasted by a considerable vulnerability in ',
+        bold: false,
+      },
+      { text: 'Compliance Documentation', bold: true },
+      { text: ', which scored a low ', bold: false },
+      { text: String(scores.cd), bold: true },
+      { text: '. This represents a major compliance and operational risk.', bold: false },
+      { text: '\n\n', bold: false },
+      {
+        text: 'To bolster the overall security posture, it is imperative to prioritize the development and enforcement of comprehensive compliance documentation. Addressing the top recommendations, particularly focusing on areas like ',
+        bold: false,
+      },
+      { text: topRecText, bold: true },
+      {
+        text: ", will have the most significant positive impact on improving the organization's resilience against cyber threats.",
+        bold: false,
+      },
+    ]
+
+    const finalSummaryY = drawMixedStyleText(
+      pdf,
+      summarySegments,
+      margin,
+      y,
+      pdfWidth - margin * 2,
+      11,
+      1.6, // Increased line height for better readability
+    )
+    y = finalSummaryY + 20
+
+    // Separator Line
+    pdf.setDrawColor('#d1d5db') // Bolder gray-300
+    pdf.setLineWidth(1.5)
+    pdf.line(margin, y, pdfWidth - margin, y)
+    y += 40
+
+    // Score Breakdown & Radar Chart Section
+    const sectionStartY = y
+    const col1Width = (pdfWidth - margin * 2) / 2 - 20
+    const col2X = margin + col1Width + 40
+
+    pdf.setFontSize(14)
+    pdf.setFont(undefined, 'bold')
+    pdf.setTextColor('#1f2937')
+    pdf.text('Score Breakdown', margin, y)
+    y += 30
+
+    // const scores = reportData.value.scores
+    const scoreItems = [
+      { label: 'Website Strength', score: scores.ws },
+      { label: 'Devices & Network', score: scores.dn },
+      { label: 'Compliance Documentation', score: scores.cd },
+      { label: 'Cyber Security', score: scores.csi },
+    ]
+
+    pdf.setFontSize(11)
+    scoreItems.forEach((item) => {
+      pdf.setTextColor('#1f2937')
+      pdf.setFont(undefined, 'bold')
+      pdf.text(item.label, margin, y)
+      const scoreColorRgb = hexToRgb(getScoreColor(item.score))
+      pdf.setTextColor(scoreColorRgb[0], scoreColorRgb[1], scoreColorRgb[2])
+      pdf.setFont(undefined, 'bold')
+      pdf.text(String(item.score), margin + col1Width, y, { align: 'right' })
+      pdf.setFont(undefined, 'normal')
+      y += 25
+    })
+
+    y += 10
+    pdf.setDrawColor('#d1d5db')
+    pdf.setLineWidth(1.5)
+    pdf.line(margin, y - 5, margin + col1Width, y - 5)
+    pdf.setFontSize(12)
+    pdf.setFont(undefined, 'bold')
+    pdf.setTextColor('#1f2937')
+    pdf.text('Overall Score', margin, y + 15)
+    const overallScoreColorRgb = hexToRgb(getScoreColor(scores.overall))
+    pdf.setTextColor(overallScoreColorRgb[0], overallScoreColorRgb[1], overallScoreColorRgb[2])
+    pdf.setFontSize(14)
+    pdf.text(String(scores.overall), margin + col1Width, y + 15, { align: 'right' })
+
+    // Add final divider line
+    const finalDividerY = Math.max(y + 30, sectionStartY + 160) // Ensure it's below content
+    pdf.setDrawColor('#d1d5db')
+    pdf.line(margin, finalDividerY, pdfWidth - margin, finalDividerY)
+
+    // Radar Chart
+    const chartCanvas = document.getElementById('pdfRadarChart')
+    const chartImg = chartCanvas.toDataURL('image/png')
+    const chartWidth = col1Width + 40 // Make chart slightly larger
+    const chartHeight = (chartCanvas.height * chartWidth) / chartCanvas.width
+    pdf.addImage(chartImg, 'PNG', col2X, sectionStartY - 10, chartWidth, chartHeight)
+
+    // --- 2. Use jsPDF-AutoTable to generate the recommendations table ---
+    if (reportData.value.recommendations && reportData.value.recommendations.length > 0) {
+      pdf.addPage()
+      pdf.autoTable({
+        head: [['Recommendation', 'Category', 'Impact']],
+        body: reportData.value.recommendations.map((rec) => [
+          rec.text,
+          rec.category,
+          `+${rec.impactScore} pts`,
+        ]),
+        startY: margin,
+        showHead: 'everyPage',
+        styles: {
+          fontSize: 11,
+          cellPadding: { top: 10, right: 12, bottom: 6, left: 12 },
+          valign: 'middle',
+        },
+        headStyles: {
+          fillColor: '#f3f4f6',
+          textColor: '#4b5563', // Black text color for headers
+          fontStyle: 'bold',
+          fontSize: 13,
+        },
+        columnStyles: {
+          0: { cellWidth: 'auto', textColor: '#374151' }, // Recommendation col text is gray-700
+          1: { halign: 'center', cellWidth: 120 }, // Center align Category column
+          2: { halign: 'center', cellWidth: 80 }, // Center align Impact column
+        },
+        didParseCell: function (data) {
+          // Center align the 'Category' header cell
+          if (data.row.section === 'head' && data.column.index === 1) {
+            data.cell.styles.halign = 'center'
+          }
+          // Style the 'Category' cells in the table body
+          if (data.column.index === 1 && data.row.section === 'body') {
+            data.cell.styles.fillColor = '#f3f4f6'
+            data.cell.styles.textColor = '#4b5563' // Black text color
+            data.cell.styles.fontStyle = 'bold'
+          }
+          // Style the 'Impact' cells in the table body
+          if (data.column.index === 2 && data.row.section === 'body') {
+            data.cell.styles.fontStyle = 'bold'
+            data.cell.styles.textColor = '#16a34a'
+          }
+        },
+      })
+    }
+
+    pdf.save(`ITIVA_Report_${reportData.value.name}.pdf`)
   } catch (error) {
-    console.error('Error generating PDF:', error)
+    console.error('Failed to generate PDF:', error)
   } finally {
+    // --- FIX: Ensure the source node is always hidden again ---
+    if (sourceNode) {
+      sourceNode.style.visibility = 'hidden'
+      sourceNode.style.display = 'none'
+      sourceNode.style.width = originalWidth // Restore original width
+    }
     isDownloading.value = false
-    document.body.classList.remove('pdf-capture-active')
   }
 }
 
 // --- Lifecycle ---
 onMounted(() => {
-  // Logic to use route query or fallback to default data
-  const reportFromStore = assessmentStore.currentReport
+  // Fetch the report ID from the route parameters.
+  const reportId = route.params.reportId
+  // Fetch the full report object directly from the reportsStore using its ID.
+  const fullReportObject = reportsStore.getReportById(reportId)
 
-  if (reportFromStore) {
+  // // --- DEBUGGING LOG ---
+  // console.log('--- ReportViewerPage: Data Fetch ---')
+  // console.log('Report ID from URL:', reportId)
+  // console.log(
+  //   'Full Report Object from store (fullReportObject):',
+  //   JSON.parse(JSON.stringify(fullReportObject)),
+  // )
+  // if (fullReportObject) {
+  //   console.log('Report Content (fullReportObject.report):', fullReportObject.report)
+  //   console.log('Properties of report content:', Object.keys(fullReportObject.report || {}))
+  // }
+  // console.log('------------------------------------')
+  // // --- END DEBUGGING LOG ---
+
+  // Check if a valid report was found.
+  if (fullReportObject && fullReportObject.report) {
+    const reportContent = fullReportObject.report
     reportData.value = {
-      name: assessmentStore.currentReportName,
-      type: assessmentStore.currentReportType,
+      name: fullReportObject.name,
+      type: fullReportObject.type,
       scores: {
-        ws: reportFromStore.ws,
-        dn: reportFromStore.dn,
-        cd: reportFromStore.cd,
-        csi: reportFromStore.cs, // Map cs to csi for the chart
-        overall: reportFromStore.overall,
+        ws: reportContent.ws,
+        dn: reportContent.dn,
+        cd: reportContent.cd,
+        csi: reportContent.cs, // Map cs to csi for the chart
+        overall: reportContent.overall,
       },
       // Use the generated recommendations directly
       // FIX: Ensure recommendations is always an array to prevent render errors.
-      recommendations: reportFromStore.recommendations || [],
+      recommendations: reportContent.recommendations || [],
     }
   } else {
+    console.error(`Report with ID "${reportId}" not found. Displaying default data.`)
     // Fallback to default data if no report is in the store
     reportData.value = {
       name: defaultReport.name,
@@ -236,15 +641,6 @@ onMounted(() => {
     }
   })
 })
-
-onBeforeUnmount(() => {
-  // This is a crucial cleanup step.
-  // The assessmentStore holds the state for the *active* session.
-  // Once the user navigates away from the report, the session is considered
-  // complete, and the store should be cleared to prevent its state from
-  // leaking into the next user action (like starting a new assessment).
-  assessmentStore.clearDraft()
-})
 </script>
 
 <template>
@@ -259,8 +655,14 @@ onBeforeUnmount(() => {
           >
             <div>
               <h1 class="text-2xl font-bold">{{ reportTitle }}</h1>
-              <p class="text-sm text-gray-300">Generated on {{ generatedDate }} by ITIVA</p>
-              <p class="text-sm text-gray-300">For: {{ reportData.name }}</p>
+              <p class="text-sm text-gray-300">
+                Generated
+                <span class="font-bold text-white">{{ reportData.name }} Report</span> on
+                {{ generatedDate }} by ITIVA
+              </p>
+              <p class="text-sm text-gray-300">
+                For: {{ authStore.currentUser?.companyName || 'Your Business' }}
+              </p>
             </div>
             <div class="flex items-center space-x-4">
               <button
@@ -412,6 +814,103 @@ onBeforeUnmount(() => {
       </div>
     </div>
     <AppFooter />
+
+    <!-- Hidden full report for PDF generation -->
+    <div class="pdf-only" ref="fullReportForPdf">
+      <div v-if="reportData" class="bg-white">
+        <div id="pdf-static-content">
+          <header class="bg-slate-800 text-white p-12">
+            <h1 class="text-5xl font-bold mb-3">{{ reportTitle }}</h1>
+            <p class="text-xl text-gray-300">
+              Generated
+              <span class="font-bold text-white">{{ reportData.name }} Report</span> on
+              {{ generatedDate }} by ITIVA
+            </p>
+            <p class="text-xl text-gray-300">
+              For: {{ authStore.currentUser?.companyName || 'Your Business' }}
+            </p>
+          </header>
+          <main class="p-12">
+            <section class="mb-8 pb-8 border-b">
+              <h2 class="text-4xl font-bold text-gray-800 mb-6">Executive Summary</h2>
+              <p class="text-2xl text-gray-600 leading-relaxed" v-html="summary"></p>
+            </section>
+            <section class="grid grid-cols-1 md:grid-cols-2 gap-12 mb-8 pb-8 border-b items-center">
+              <div>
+                <h2 class="text-3xl font-bold text-gray-800 mb-6">Score Breakdown</h2>
+                <div class="space-y-4">
+                  <div class="flex justify-between items-center">
+                    <span class="font-medium text-2xl">Website Strength</span>
+                    <span
+                      class="font-bold text-3xl"
+                      :style="{ color: getScoreColor(reportData.scores.ws) }"
+                      >{{ reportData.scores.ws }}</span
+                    >
+                  </div>
+                  <div class="flex justify-between items-center">
+                    <span class="font-medium text-2xl">Devices & Network</span>
+                    <span
+                      class="font-bold text-3xl"
+                      :style="{ color: getScoreColor(reportData.scores.dn) }"
+                      >{{ reportData.scores.dn }}</span
+                    >
+                  </div>
+                  <div class="flex justify-between items-center">
+                    <span class="font-medium text-2xl">Compliance Documentation</span>
+                    <span
+                      class="font-bold text-3xl"
+                      :style="{ color: getScoreColor(reportData.scores.cd) }"
+                      >{{ reportData.scores.cd }}</span
+                    >
+                  </div>
+                  <div class="flex justify-between items-center">
+                    <span class="font-medium text-2xl">Cyber Security</span>
+                    <span
+                      class="font-bold text-3xl"
+                      :style="{ color: getScoreColor(reportData.scores.csi) }"
+                      >{{ reportData.scores.csi }}</span
+                    >
+                  </div>
+                  <div class="border-t pt-4 mt-4 flex justify-between items-center">
+                    <span class="font-bold text-2xl">Overall Score</span
+                    ><span
+                      class="font-bold text-4xl"
+                      :style="{ color: getScoreColor(reportData.scores.overall) }"
+                      >{{ reportData.scores.overall }}</span
+                    >
+                  </div>
+                </div>
+              </div>
+              <div class="w-full h-64 md:h-auto">
+                <canvas id="pdfRadarChart"></canvas>
+              </div>
+            </section>
+          </main>
+        </div>
+        <table id="pdf-recommendations-table" class="min-w-full bg-white">
+          <thead class="bg-gray-100">
+            <tr>
+              <th class="py-5 px-8 text-left text-2xl font-bold text-gray-600 w-2/3">
+                Recommendation
+              </th>
+              <th class="py-5 px-8 text-center text-2xl font-bold text-gray-600 w-1/6">Category</th>
+              <th class="py-5 px-8 text-center text-2xl font-bold text-gray-600 w-24">Impact</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="rec in reportData.recommendations" :key="rec.text" class="border-b">
+              <td class="py-5 px-8 text-2xl text-gray-700">{{ rec.text }}</td>
+              <td class="py-5 px-8 bg-gray-100 text-center text-2xl font-medium text-gray-800">
+                {{ rec.category }}
+              </td>
+              <td class="py-5 px-8 font-bold text-2xl text-green-600 text-center">
+                +{{ rec.impactScore }} pts
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
   </div>
 </template>
 

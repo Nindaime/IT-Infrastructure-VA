@@ -44,7 +44,8 @@ const router = createRouter({
       meta: { showHeaderAndFooter: false },
     },
     {
-      path: '/report/:businessName?', // Make businessName optional
+      // path: '/report/:businessName?', // Make businessName optional
+      path: '/report/:reportId',
       name: 'ReportViewerPage', // Renamed for clarity in route push
       component: ReportViewerPage,
       props: true, // Pass route params as props to the component

@@ -152,7 +152,7 @@ async function handleLogin() {
 /**
  * Handles the registration attempt using the new user management system.
  */
-function handleRegister() {
+async function handleRegister() {
   errorMessage.value = '' // Clear previous error messages
 
   // Basic validation for demonstration (can be extended)
@@ -188,8 +188,10 @@ function handleRegister() {
 
   // Create user data object
   const userData = {
-    username: registrationUserName.value || email.value.split('@')[0],
+    // FIX: Use the correct property names (userName, userFullName) expected by the auth store.
+    userName: registrationUserName.value || email.value.split('@')[0],
     password: password.value,
+    userFullName: `${firstName.value} ${lastName.value}`.trim(),
     firstName: firstName.value,
     lastName: lastName.value,
     email: email.value,
@@ -202,9 +204,14 @@ function handleRegister() {
   }
 
   try {
-    // Register the user using the new system
+    // Step 1: Register the user using the new system
     authStore.register(userData)
-    router.push('/dashboard')
+
+    // Step 2: Immediately log the new user in to create an active session.
+    await authStore.login(userData.userName, userData.password)
+
+    // Step 3: Redirect to the dashboard, now with an active session.
+    await router.push('/dashboard')
   } catch (error) {
     errorMessage.value = 'Registration failed. Please try again.'
     console.error('Registration error:', error)

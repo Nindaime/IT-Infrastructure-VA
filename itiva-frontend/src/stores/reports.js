@@ -6,50 +6,16 @@
  */
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
+import { useAuthStore } from './auth'
+import { v4 as uuidv4 } from 'uuid'
 import { safeStorage } from '@/utils/errorHandler'
 import { validateReportData, validateRequiredFields } from '@/utils/testUtils'
-import { generateMockReport } from '@/utils/reportGenerator'
-
-// Initial mock data for reports, used if nothing is in sessionStorage
-const reportsWithTargets = [
-  {
-    id: 1,
-    name: 'Q1 2024 IT Security Audit',
-    date: '2024-03-15',
-    type: 'Standard ITIVA Assessment',
-    targetScores: { ws: 78, dn: 85, cd: 60, cs: 90 },
-  },
-  {
-    id: 2,
-    name: 'Cloud Infrastructure Review',
-    date: '2024-02-01',
-    type: 'Advanced Cloud Security Check',
-    targetScores: { ws: 92, dn: 88, cd: 75, cs: 85 },
-  },
-  {
-    id: 3,
-    name: 'Network Penetration Test',
-    date: '2024-01-20',
-    type: 'GDPR Compliance Audit',
-    targetScores: { ws: 65, dn: 70, cd: 55, cs: 62 },
-  },
-]
-
-const initialReports = reportsWithTargets.map((r) => {
-  const generatedReport = generateMockReport(r.targetScores)
-  return {
-    ...r,
-    score: generatedReport.overall,
-    report: generatedReport,
-    status: 'completed', // All initial reports are completed
-    isDraft: false,
-  }
-})
 
 export const useReportsStore = defineStore('reports', () => {
-  // State
-  const completedReports = ref([])
-  const draftReports = ref([])
+  // --- State ---
+  // These now hold ALL reports for ALL users. Filtering happens in getters.
+  const allCompletedReports = ref([])
+  const allDraftReports = ref([])
 
   // Load reports from localStorage
   const loadReportsFromStorage = () => {
@@ -58,11 +24,11 @@ export const useReportsStore = defineStore('reports', () => {
       const storedDrafts = safeStorage.getItem('reports-drafts', [])
 
       if (Array.isArray(storedCompleted)) {
-        completedReports.value = storedCompleted
+        allCompletedReports.value = storedCompleted
       }
 
       if (Array.isArray(storedDrafts)) {
-        draftReports.value = storedDrafts
+        allDraftReports.value = storedDrafts
       }
     } catch (error) {
       console.error('Error loading reports from storage:', error)
@@ -72,17 +38,33 @@ export const useReportsStore = defineStore('reports', () => {
   // Save reports to localStorage
   const saveReportsToStorage = () => {
     try {
-      safeStorage.setItem('reports-completed', completedReports.value)
-      safeStorage.setItem('reports-drafts', draftReports.value)
-      return true
+      safeStorage.setItem('reports-completed', allCompletedReports.value)
+      safeStorage.setItem('reports-drafts', allDraftReports.value)
     } catch (error) {
       console.error('Error saving reports to storage:', error)
-      return false
     }
   }
 
-  // Initialize store
-  loadReportsFromStorage()
+  // --- Computed Properties (Getters) ---
+  // These are now dynamic and only return data for the logged-in user.
+
+  const completedReports = computed(() => {
+    // Get the current user's ID. If no user is logged in, this will be undefined.
+    const currentAuthStore = useAuthStore()
+    const currentUserId = currentAuthStore.currentUser?.id
+    if (!currentUserId) return [] // Return an empty array if no user is logged in.
+    // Filter the global list to get reports only for the current user.
+    return allCompletedReports.value.filter((report) => report.userId === currentUserId)
+  })
+
+  const draftReports = computed(() => {
+    // Get the current user's ID.
+    const currentAuthStore = useAuthStore()
+    const currentUserId = currentAuthStore.currentUser?.id
+    if (!currentUserId) return [] // Return an empty array if no user is logged in.
+    // Filter the global list to get drafts only for the current user.
+    return allDraftReports.value.filter((draft) => draft.userId === currentUserId)
+  })
 
   // Computed properties
   const userReports = computed(() => {
@@ -125,46 +107,47 @@ export const useReportsStore = defineStore('reports', () => {
     }
   })
 
-  // Actions
+  // --- Actions ---
+  /**
+   * Adds a new completed report for the current user.
+   * @param {object} reportData - The report object, without userId.
+   */
   const addReport = (reportData) => {
-    try {
-      // Validate required fields
-      validateRequiredFields(reportData, ['name', 'date', 'type', 'score', 'report'])
+    const authStore = useAuthStore()
+    // Ensure the user is logged in before adding a report.
+    // This will ensure that only authenticated users can add reports.
+    // This is a critical security measure to prevent unauthorized report creation.
+    // If the user is not logged in, we throw an error.
+    // This prevents unauthorized users from adding reports.
 
-      // Validate report data structure
-      const validation = validateReportData(reportData)
-      if (!validation.isValid) {
-        throw new Error(`Report validation failed: ${validation.errors.join(', ')}`)
-      }
+    // FIX: Check for currentUser.id, not a non-existent userId property.
 
-      // Check if report with same name already exists
-      const existingReport = completedReports.value.find((r) => r.name === reportData.name)
-      if (existingReport) {
-        throw new Error('A report with this name already exists')
-      }
+    if (!authStore.currentUser?.id) throw new Error('User must be logged in to add a report.')
 
-      // Create new report
-      const newReport = {
-        id: `report-${Date.now()}`,
-        name: reportData.name,
-        date: reportData.date,
-        type: reportData.type,
-        score: reportData.score,
-        report: reportData.report,
-        createdAt: new Date().toISOString(),
-      }
+    // Validate required fields
+    validateRequiredFields(reportData, ['name', 'date', 'type', 'score', 'report'])
 
-      // Add to store
-      completedReports.value.push(newReport)
-
-      // Save to storage
-      saveReportsToStorage()
-
-      return { success: true, report: newReport }
-    } catch (error) {
-      console.error('Error adding report:', error)
-      throw error
+    // Validate report data structure
+    const validation = validateReportData(reportData)
+    if (!validation.isValid) {
+      throw new Error(`Report validation failed: ${validation.errors.join(', ')}`)
     }
+
+    // Check if report with same name already exists
+    const existingReport = completedReports.value.find((r) => r.name === reportData.name)
+    if (existingReport) {
+      throw new Error('A report with this name already exists')
+    }
+
+    const newReport = {
+      ...reportData,
+      id: uuidv4(), // Ensure unique ID for the report
+      userId: authStore.currentUser.id, // Associate with the current user's ID
+      createdAt: new Date().toISOString(),
+    }
+    allCompletedReports.value.push(newReport)
+    saveReportsToStorage()
+    return newReport
   }
 
   /**
@@ -174,10 +157,15 @@ export const useReportsStore = defineStore('reports', () => {
    */
   const saveOrUpdateDraft = (draftData) => {
     try {
+      const authStore = useAuthStore()
+      // Ensure the user is logged in before saving a draft.
+      // FIX: Check for currentUser.id
+      if (!authStore.currentUser?.id) throw new Error('User must be logged in to save a draft.')
+
       validateRequiredFields(draftData, ['id', 'name', 'date', 'type', 'questions', 'answers'])
 
       // Check if a draft with the same *ID* already exists in our list.
-      const draftIndex = draftReports.value.findIndex((d) => d.id === draftData.id)
+      const draftIndex = allDraftReports.value.findIndex((d) => d.id === draftData.id)
 
       if (draftIndex !== -1) {
         // --- UPDATE PATH ---
@@ -187,8 +175,8 @@ export const useReportsStore = defineStore('reports', () => {
         )
         if (existingNameConflict) throw new Error('Another draft with this name already exists.')
 
-        draftReports.value[draftIndex] = {
-          ...draftReports.value[draftIndex],
+        allDraftReports.value[draftIndex] = {
+          ...allDraftReports.value[draftIndex],
           ...draftData,
           lastModified: new Date().toISOString(),
         }
@@ -203,10 +191,12 @@ export const useReportsStore = defineStore('reports', () => {
 
         const newDraft = {
           ...draftData,
+          id: draftData.id || uuidv4(),
+          userId: authStore.currentUser.id,
           createdAt: new Date().toISOString(),
           lastModified: new Date().toISOString(),
         }
-        draftReports.value.push(newDraft)
+        allDraftReports.value.push(newDraft)
         saveReportsToStorage()
         return { success: true, draft: newDraft, operation: 'added' }
       }
@@ -215,79 +205,6 @@ export const useReportsStore = defineStore('reports', () => {
       throw error
     }
   }
-
-  // const addDraftReport = (draftData) => {
-  //   try {
-  //     // Validate required fields
-  //     validateRequiredFields(draftData, ['name', 'date', 'type'])
-
-  //     // Check if draft with same name already exists
-  //     const existingDraft = draftReports.value.find((d) => d.name === draftData.name)
-  //     if (existingDraft) {
-  //       throw new Error('A draft with this name already exists')
-  //     }
-
-  //     // Create new draft report
-  //     const newDraft = {
-  //       id: `draft-${Date.now()}`,
-  //       name: draftData.name,
-  //       date: draftData.date,
-  //       type: draftData.type,
-  //       lastModified: draftData.lastModified || new Date().toISOString(),
-  //       createdAt: new Date().toISOString(),
-  //     }
-
-  //     // Add to store
-  //     draftReports.value.push(newDraft)
-
-  //     // Save to storage
-  //     saveReportsToStorage()
-
-  //     return { success: true, draft: newDraft }
-  //   } catch (error) {
-  //     console.error('Error adding draft report:', error)
-  //     throw error
-  //   }
-  // }
-
-  // const updateDraftReport = (draftId, updates) => {
-  //   try {
-  //     if (!draftId) {
-  //       throw new Error('Draft ID is required')
-  //     }
-
-  //     // Find draft index
-  //     const draftIndex = draftReports.value.findIndex((d) => d.id === draftId)
-  //     if (draftIndex === -1) {
-  //       throw new Error('Draft not found')
-  //     }
-
-  //     // Validate updates
-  //     if (updates.name) {
-  //       const existingDraft = draftReports.value.find(
-  //         (d) => d.name === updates.name && d.id !== draftId,
-  //       )
-  //       if (existingDraft) {
-  //         throw new Error('A draft with this name already exists')
-  //       }
-  //     }
-
-  //     // Apply updates
-  //     draftReports.value[draftIndex] = {
-  //       ...draftReports.value[draftIndex],
-  //       ...updates,
-  //       lastModified: new Date().toISOString(),
-  //     }
-
-  //     // Save to storage
-  //     saveReportsToStorage()
-
-  //     return { success: true, draft: draftReports.value[draftIndex] }
-  //   } catch (error) {
-  //     console.error('Error updating draft report:', error)
-  //     throw error
-  //   }
-  // }
 
   const completeDraftReport = (draftId, reportData) => {
     try {
@@ -335,58 +252,74 @@ export const useReportsStore = defineStore('reports', () => {
     }
   }
 
+  /**
+   * Deletes a report or a draft for the current user.
+   * @param {string} reportId - The ID of the report/draft to delete.
+   */
   const deleteReport = (reportId) => {
-    try {
-      if (!reportId) {
-        throw new Error('Report ID is required')
-      }
+    const authStore = useAuthStore()
+    if (!authStore.currentUser?.id) throw new Error('Authentication required.')
 
-      // Try to find in completed reports
-      let reportIndex = completedReports.value.findIndex((r) => r.id === reportId)
-      if (reportIndex !== -1) {
-        completedReports.value.splice(reportIndex, 1)
-        saveReportsToStorage()
-        return { success: true, type: 'completed' }
-      }
-
-      // Try to find in draft reports
-      reportIndex = draftReports.value.findIndex((r) => r.id === reportId)
-      if (reportIndex !== -1) {
-        draftReports.value.splice(reportIndex, 1)
-        saveReportsToStorage()
-        return { success: true, type: 'draft' }
-      }
-
-      // *** FIX: Instead of throwing an error, handle the "not found" case gracefully. ***
-      // This is expected when completing a new assessment that was never saved as a named draft.
-      console.warn(`Attempted to delete report with ID '${reportId}', but it was not found.`)
-      return { success: false, message: 'Report not found' }
-    } catch (error) {
-      // Re-throw any other unexpected errors.
-      console.error('Error deleting report:', error)
-      throw error
+    // Check and remove from completed reports
+    let index = allCompletedReports.value.findIndex(
+      (r) => r.id === reportId && r.userId === authStore.currentUser.id,
+    )
+    if (index !== -1) {
+      allCompletedReports.value.splice(index, 1)
+      saveReportsToStorage()
+      return { success: true, type: 'completed' }
     }
+
+    // Check and remove from drafts
+    index = allDraftReports.value.findIndex(
+      (d) => d.id === reportId && d.userId === authStore.currentUser.id,
+    )
+    if (index !== -1) {
+      allDraftReports.value.splice(index, 1)
+      saveReportsToStorage()
+      return { success: true, type: 'draft' }
+    }
+
+    // Instead of throwing an error, which breaks the submission flow,
+    // we can just log a warning. This is an expected and normal scenario when a user
+    // completes a new assessment that was never saved to the main draft list.
+    console.warn(
+      `Attempted to delete report/draft with ID '${reportId}', but it was not found. This is normal for new assessments.`,
+    )
+    return { success: false, message: 'Report not found' } // Return a non-error state
   }
 
   const getReportById = (reportId) => {
     try {
+      const authStore = useAuthStore()
+      const currentUserId = authStore.currentUser?.id
+
       if (!reportId) {
-        throw new Error('Report ID is required')
+        // throw new Error('Report ID is required')
+        console.error('getReportById called without a reportId.')
+        return null
       }
 
-      // Search in completed reports
-      const completedReport = completedReports.value.find((r) => r.id === reportId)
+      // Search in all completed reports first
+      const completedReport = allCompletedReports.value.find((r) => r.id === reportId)
       if (completedReport) {
-        return { ...completedReport, isDraft: false }
+        // Security check: ensure the report belongs to the current user
+        if (completedReport.userId === currentUserId) {
+          return { ...completedReport, isDraft: false }
+        }
       }
 
       // Search in draft reports
-      const draftReport = draftReports.value.find((r) => r.id === reportId)
+      const draftReport = allDraftReports.value.find((r) => r.id === reportId)
       if (draftReport) {
-        return { ...draftReport, isDraft: true }
+        // Security check for drafts
+        if (draftReport.userId === currentUserId) {
+          return { ...draftReport, isDraft: true }
+        }
       }
 
-      return null
+      // If not found in either or user does not have permission, return null
+      return null // Explicitly return null if no report is found or accessible
     } catch (error) {
       console.error('Error getting report by ID:', error)
       return null
@@ -399,10 +332,9 @@ export const useReportsStore = defineStore('reports', () => {
         throw new Error('Draft ID is required')
       }
 
-      return draftReports.value.find((d) => d.id === draftId) || null
+      return draftReports.value.find((d) => d.id === draftId)
     } catch (error) {
       console.error('Error getting draft by ID:', error)
-      return null
     }
   }
 
@@ -461,8 +393,8 @@ export const useReportsStore = defineStore('reports', () => {
 
   const clearAllReports = () => {
     try {
-      completedReports.value = []
-      draftReports.value = []
+      allCompletedReports.value = []
+      allDraftReports.value = []
       saveReportsToStorage()
       return { success: true }
     } catch (error) {
@@ -471,10 +403,12 @@ export const useReportsStore = defineStore('reports', () => {
     }
   }
 
+  // Initial load from storage when the store is created
+  loadReportsFromStorage()
+
   return {
     // State
     completedReports,
-    initialReports,
     draftReports,
 
     // Computed

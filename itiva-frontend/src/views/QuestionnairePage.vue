@@ -408,20 +408,16 @@ async function handleReportNameSubmission() {
     const report = generateReportFromAnswers()
     assessmentStore.setGeneratedReport(report, reportName, assessmentType.value)
 
-    // If the assessment was started from a draft, we need to remove the old draft entry
-    // from the reports store if it exists.
+    // If we are in draft mode, it means we were working on an assessment session
+    // that has an ID. We attempt to delete any corresponding entry from the
+    // main reports list. This is safe because deleteReport only removes items
+    // that match the ID and user.
     if (assessmentStore.isDraftMode) {
-      // This will safely remove the draft by its ID.
-      // If it was never saved to the reports list, this will do nothing.
-      // Ensure we are deleting a *draft* by its ID. This prevents accidental
-      // deletion of a *completed report* if something goes wrong.
-      if (assessmentStore.currentDraft.isDraft) {
-        reportsStore.deleteReport(assessmentStore.currentDraft.id)
-      }
+      reportsStore.deleteReport(assessmentStore.currentDraft.id)
     }
 
     // Add the new, completed report to the reports store.
-    reportsStore.addReport({
+    const newCompletedReport = reportsStore.addReport({
       name: reportName,
       date: new Date().toISOString().split('T')[0],
       type: assessmentType.value,
@@ -429,12 +425,18 @@ async function handleReportNameSubmission() {
       report: report,
     })
 
+    // After successfully creating the report and deleting the old draft,
+    // we should now clear the active assessment session from the store.
+    assessmentStore.clearDraft()
+
     // Set the flag to true right before navigating to bypass the onBeforeRouteLeave guard.
     isNavigatingAfterSubmit.value = true
 
     // Wait for success modal to be visible, then navigate
     await new Promise((resolve) => setTimeout(resolve, 2000))
-    await router.push({ name: 'ReportViewerPage' })
+    // Navigate to the ReportViewerPage, passing the new report's ID as a parameter.
+    // This is a more robust way to ensure the correct report is displayed.
+    await router.push({ name: 'ReportViewerPage', params: { reportId: newCompletedReport.id } })
   } catch (error) {
     console.error('Error during report submission or navigation:', error)
     showToast('Failed to finalize report. Please try again.', 'error')
@@ -464,6 +466,12 @@ function cancelSwitch() {
 
 // --- Keyboard Shortcuts ---
 function handleKeyboardShortcuts(event) {
+  // Defensive check: If the current question isn't loaded yet, do nothing.
+  // This prevents errors if a keydown event fires before the component is fully initialized.
+  if (!currentQuestion.value) {
+    return
+  }
+
   // Only handle shortcuts if no modal is open
   if (
     showDraftSaveModal.value ||
@@ -495,8 +503,26 @@ function handleKeyboardShortcuts(event) {
       }
       break
     case '1':
+      if (currentQuestion.value.options.length >= parseInt(event.key)) {
+        event.preventDefault()
+        const optionIndex = parseInt(event.key) - 1
+        selectAnswer(currentQuestion.value.options[optionIndex])
+      }
+      break
     case '2':
+      if (currentQuestion.value.options.length >= parseInt(event.key)) {
+        event.preventDefault()
+        const optionIndex = parseInt(event.key) - 1
+        selectAnswer(currentQuestion.value.options[optionIndex])
+      }
+      break
     case '3':
+      if (currentQuestion.value.options.length >= parseInt(event.key)) {
+        event.preventDefault()
+        const optionIndex = parseInt(event.key) - 1
+        selectAnswer(currentQuestion.value.options[optionIndex])
+      }
+      break
     case '4':
       if (currentQuestion.value.options.length >= parseInt(event.key)) {
         event.preventDefault()

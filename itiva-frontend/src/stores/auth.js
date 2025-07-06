@@ -2,6 +2,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { safeStorage } from '@/utils/errorHandler'
+import { v4 as uuidv4 } from 'uuid' // Import UUID for unique user IDs
 import { validateUserData, validateRequiredFields } from '@/utils/testUtils'
 
 export const useAuthStore = defineStore('auth', () => {
@@ -89,6 +90,7 @@ export const useAuthStore = defineStore('auth', () => {
   // --- OPTIMIZED: Actions ---
   const register = async (userData) => {
     try {
+      loadUsersFromStorage()
       // Validate required fields based on the form
       validateRequiredFields(userData, ['userName', 'firstName', 'lastName', 'email', 'password'])
 
@@ -112,17 +114,8 @@ export const useAuthStore = defineStore('auth', () => {
 
       // Create new user object matching the form structure
       const newUser = {
-        id: Date.now().toString(),
-        userName: userData.userName,
-        password: userData.password,
-        firstName: userData.firstName,
-        lastName: userData.lastName,
-        email: userData.email,
-        companyName: userData.companyName || '',
-        companyDescription: userData.companyDescription || '',
-        address: userData.address || '',
-        city: userData.city || '',
-        businessType: userData.businessType || '',
+        ...userData,
+        id: uuidv4(), // Generate a unique ID for the new user
         isAdmin: userData.isAdmin || false,
         createdAt: new Date().toISOString(),
       }
@@ -145,6 +138,7 @@ export const useAuthStore = defineStore('auth', () => {
 
   const login = async (loginIdentifier, password) => {
     try {
+      loadUsersFromStorage()
       // Validate inputs
       if (!loginIdentifier || !password) {
         throw new Error('Username/email and password are required')

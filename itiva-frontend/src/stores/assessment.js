@@ -73,7 +73,6 @@ export const useAssessmentStore = defineStore('assessment', () => {
     if (!draft.value?.questions?.length) return 0
     const totalQuestions = draft.value.questions.length
     const answeredQuestions = Object.values(draft.value.answers || {}).filter(Boolean).length
-
     return Math.round((answeredQuestions / totalQuestions) * 100)
   })
 

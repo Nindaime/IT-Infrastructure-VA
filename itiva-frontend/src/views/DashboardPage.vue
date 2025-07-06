@@ -84,9 +84,9 @@ function getScoreColorClass(score) {
 async function viewReport(report) {
   try {
     isLoading.value = true
-    // The assessment store is still needed to pass the *currently viewed* report to the viewer page
-    assessmentStore.setGeneratedReport(report.report, report.name, report.type)
-    await router.push({ name: 'ReportViewerPage' })
+    // No longer pass data via the assessmentStore. Instead, navigate with the report's
+    // unique ID as a route parameter. This makes the ReportViewerPage self-sufficient.
+    await router.push({ name: 'ReportViewerPage', params: { reportId: report.id } })
   } catch (error) {
     console.error('Error navigating to report:', error)
   } finally {
