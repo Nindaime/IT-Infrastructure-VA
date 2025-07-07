@@ -66,6 +66,13 @@ export const useReportsStore = defineStore('reports', () => {
     return allDraftReports.value.filter((draft) => draft.userId === currentUserId)
   })
 
+  const allReports = computed(() => {
+    return [
+      ...allCompletedReports.value.map((report) => ({ ...report, isDraft: false })),
+      ...allDraftReports.value.map((report) => ({ ...report, isDraft: true })),
+    ]
+  })
+
   // Computed properties
   const userReports = computed(() => {
     try {
@@ -91,20 +98,31 @@ export const useReportsStore = defineStore('reports', () => {
   })
 
   const averageScore = computed(() => {
-    try {
-      if (completedReports.value.length === 0) {
-        return 0
+    const reports = completedReports.value // This is already for the current user
+    if (reports.length === 0) return 'N/A'
+
+    // Group reports by type
+    const reportsByType = reports.reduce((acc, report) => {
+      const type = report.type
+      if (!acc[type]) {
+        acc[type] = []
       }
+      acc[type].push(report)
+      return acc
+    }, {})
 
-      const totalScore = completedReports.value.reduce((sum, report) => {
-        return sum + (report.score || 0)
-      }, 0)
+    // Find the latest report for each type and get its score
+    const latestScores = Object.values(reportsByType).map((group) => {
+      // Sort by date descending to get the latest one
+      const latestReport = group.sort((a, b) => new Date(b.date) - new Date(a.date))[0]
+      return latestReport.score
+    })
 
-      return Math.round(totalScore / completedReports.value.length)
-    } catch (error) {
-      console.error('Error computing average score:', error)
-      return 0
-    }
+    // Calculate the average of the latest scores
+    if (latestScores.length === 0) return 'N/A'
+    const sumOfLatestScores = latestScores.reduce((sum, score) => sum + score, 0)
+    const avg = sumOfLatestScores / latestScores.length
+    return avg.toFixed(1)
   })
 
   // --- Actions ---
@@ -127,10 +145,19 @@ export const useReportsStore = defineStore('reports', () => {
     // Validate required fields
     validateRequiredFields(reportData, ['name', 'date', 'type', 'score', 'report'])
 
-    // Validate report data structure
-    const validation = validateReportData(reportData)
-    if (!validation.isValid) {
-      throw new Error(`Report validation failed: ${validation.errors.join(', ')}`)
+    // NEW: In-line validation for the dynamic report structure.
+    // The old `validateReportData` was checking for a static structure (ws, dn, etc.)
+    // which is no longer used, causing the submission to fail.
+    const reportContent = reportData.report
+    const errors = []
+    if (typeof reportContent.overall !== 'number') {
+      errors.push('Report content missing required field: overall')
+    }
+    if (!Array.isArray(reportContent.categoryScores)) {
+      errors.push('Report content missing required field: categoryScores')
+    }
+    if (errors.length > 0) {
+      throw new Error(`Report validation failed: ${errors.join(', ')}`)
     }
 
     // Check if report with same name already exists
@@ -391,6 +418,41 @@ export const useReportsStore = defineStore('reports', () => {
     }
   }
 
+  const calculateUserAverageScoreAndReports = (userId, assessmentTypes) => {
+    const userReports = allCompletedReports.value.filter((r) => r.userId === userId && !r.isDraft)
+
+    if (userReports.length === 0) return null
+
+    // Group reports by type
+    const reportsByType = userReports.reduce((acc, report) => {
+      const type = report.type
+      if (!acc[type]) acc[type] = []
+      acc[type].push(report)
+      return acc
+    }, {})
+
+    // Check if user has completed one of each active assessment type
+    const hasCompletedAllTypes = assessmentTypes.every(
+      (type) => reportsByType[type] && reportsByType[type].length > 0,
+    )
+
+    if (!hasCompletedAllTypes) return null
+
+    // Find the latest report for each type
+    const latestReports = assessmentTypes.map((type) => {
+      const group = reportsByType[type]
+      return group.sort((a, b) => new Date(b.date) - new Date(a.date))[0]
+    })
+
+    if (latestReports.length === 0) return null
+
+    // Calculate average score
+    const sumOfLatestScores = latestReports.reduce((sum, report) => sum + report.score, 0)
+    const averageScore = sumOfLatestScores / latestReports.length
+
+    return { averageScore, latestReports }
+  }
+
   const clearAllReports = () => {
     try {
       allCompletedReports.value = []
@@ -412,6 +474,7 @@ export const useReportsStore = defineStore('reports', () => {
     draftReports,
 
     // Computed
+    allReports,
     userReports,
     hasDrafts,
     totalReports,
@@ -420,8 +483,7 @@ export const useReportsStore = defineStore('reports', () => {
     // Actions
     addReport,
     saveOrUpdateDraft,
-    // addDraftReport,
-    // updateDraftReport,
+    calculateUserAverageScoreAndReports,
     completeDraftReport,
     deleteReport,
     getReportById,

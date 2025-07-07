@@ -1,0 +1,276 @@
+assessment_name,question_number,option,score,explanation
+Standard ITIVA Assessment,1,"Yes, on all pages, with HSTS enabled",2,"The gold standard, enforcing encryption and protecting against downgrade attacks."
+Standard ITIVA Assessment,1,"Yes, standard certificate on all pages",1,Good security. The entire site is encrypted.
+Standard ITIVA Assessment,1,Only on sensitive pages,0,A partial implementation that leaves other pages vulnerable.
+Standard ITIVA Assessment,1,Certificate is expired/misconfigured,-1,Creates security warnings and may not provide proper encryption.
+Standard ITIVA Assessment,1,"No, we use HTTP only",-2,A critical vulnerability. All data is sent in plaintext.
+Standard ITIVA Assessment,2,"Yes, we use an automated process to scan and apply security patches within 48 hours of release.",2,A proactive and rapid patching process that minimizes the window of opportunity for attackers.
+Standard ITIVA Assessment,2,"Yes, we check for and apply updates manually on a weekly basis.",1,"A good, disciplined process, though slightly slower than an automated one."
+Standard ITIVA Assessment,2,We apply updates sporadically or only when something breaks.,0,An inconsistent process that likely leaves vulnerabilities open for extended periods.
+Standard ITIVA Assessment,2,"We rarely update, or only update major versions.",-1,This guarantees that numerous known vulnerabilities exist on the website.
+Standard ITIVA Assessment,2,We do not know how to or never update our website components.,-2,"A high-risk state, making a compromise of the website highly probable."
+Standard ITIVA Assessment,3,"Yes, a managed WAF with custom rules tailored to our application.",2,"The most effective WAF implementation, offering protection against both common and application-specific attacks."
+Standard ITIVA Assessment,3,"Yes, we use a standard WAF provided by our hosting or CDN provider.",1,A strong protective measure against a wide range of common attacks.
+Standard ITIVA Assessment,3,We are planning to implement one.,0,Awareness without protection offers no current security benefit.
+Standard ITIVA Assessment,3,I don't know.,-1,Lack of awareness of a critical security control is a significant vulnerability in itself.
+Standard ITIVA Assessment,3,"No, we do not have a WAF.",-2,The website is fully exposed to common attacks like SQL injection and XSS without a dedicated filter.
+Standard ITIVA Assessment,4,"Yes, comprehensive validation is strictly enforced on both the client and server-side.",2,Robust protection against data injection attacks by treating all user input as untrusted.
+Standard ITIVA Assessment,4,"Yes, all inputs are validated on the server-side.",1,"Good security, as server-side validation cannot be bypassed by an attacker."
+Standard ITIVA Assessment,4,We mostly rely on frontend validation.,-1,"A significant vulnerability, as client-side validation can be easily bypassed."
+Standard ITIVA Assessment,4,Validation is inconsistent and only applied to some forms.,-1,Inconsistent validation leaves predictable and exploitable holes in security.
+Standard ITIVA Assessment,4,"No, we do not perform input validation.",-2,A critical flaw that makes the application highly susceptible to injection attacks.
+Standard ITIVA Assessment,5,"Yes, we enforce complexity, length, and 2FA for all accounts, especially admins.",2,A comprehensive approach that protects against brute-force attacks and credential stuffing.
+Standard ITIVA Assessment,5,"Yes, we enforce password complexity (e.g., uppercase, numbers, symbols) and length.",1,A strong foundational policy that prevents weak and easily guessable passwords.
+Standard ITIVA Assessment,5,We have a basic password length requirement only.,0,A minimal standard that is better than nothing but still allows for weak passwords.
+Standard ITIVA Assessment,5,We have no password requirements; users can set anything.,-2,A critical risk that allows for extremely weak passwords and easy account compromise.
+Standard ITIVA Assessment,5,We have shared administrator accounts.,-2,"This is a major security risk, as it makes auditing impossible and simplifies unauthorized access."
+Standard ITIVA Assessment,6,"Yes, automated daily backups are encrypted and stored in a secure, geographically separate location.",2,"The gold standard for disaster recovery, ensuring business continuity with minimal data loss."
+Standard ITIVA Assessment,6,"Yes, automated daily or weekly backups are stored with our hosting provider.",1,"A good practice that ensures data can be recovered, though with a potential 24-hour data loss."
+Standard ITIVA Assessment,6,We perform manual backups sporadically.,-1,"Unreliable and prone to human error, leading to significant data loss."
+Standard ITIVA Assessment,6,"We have backups, but they are old or we've never tested restoring them.",-2,A useless backup system that provides a false sense of security.
+Standard ITIVA Assessment,6,"No, we do not have backups.",-2,A critical failure in business continuity planning. A single event could lead to total data loss.
+Standard ITIVA Assessment,7,"Yes, user roles are strictly defined, and access is granted on a need-to-know basis.",2,A mature security design that minimizes the impact of a potential account compromise.
+Standard ITIVA Assessment,7,"Yes, we have different roles for administrators and regular users.",1,"A good, basic security practice that separates administrative functions from normal use."
+Standard ITIVA Assessment,7,User roles are not well-defined; many users have high-level privileges.,-1,"A significant risk, as a compromise of any user account could lead to a full system compromise."
+Standard ITIVA Assessment,7,All users share the same level of access.,-2,"A critical vulnerability. If one account is breached, the entire system is breached."
+Standard ITIVA Assessment,7,I don't know what the principle of least privilege is.,-1,Lack of awareness indicates that security was not a consideration in the system's design.
+Standard ITIVA Assessment,8,"Yes, we have a strong Content Security Policy (CSP) and use multiple security headers.",2,A proactive defense that significantly hardens the website against common client-side attacks.
+Standard ITIVA Assessment,8,"Yes, we have implemented basic security headers like X-Frame-Options.",1,A good first step that protects against clickjacking attacks.
+Standard ITIVA Assessment,8,We are aware of them but have not implemented them yet.,0,Awareness without action provides no security benefit.
+Standard ITIVA Assessment,8,I don't know what security headers are.,-1,"Indicates a lack of fundamental web security knowledge, suggesting other vulnerabilities may exist."
+Standard ITIVA Assessment,8,"No, we have not implemented any security headers.",-2,The website is left open to a wide range of well-known and easily preventable attacks.
+Standard ITIVA Assessment,9,"Yes, we have an automated, real-time inventory of all hardware and software assets.",2,Best practice for asset management. You know exactly what is on your network at all times.
+Standard ITIVA Assessment,9,"Yes, we maintain a manually updated spreadsheet or document of all devices.",1,"A good practice, but prone to human error and becoming outdated quickly."
+Standard ITIVA Assessment,9,We have a partial or outdated inventory.,0,"Better than nothing, but significant blind spots exist, which are a security risk."
+Standard ITIVA Assessment,9,I don't know.,-1,A known unknown. It implies a lack of control and visibility over the network.
+Standard ITIVA Assessment,9,"No, we do not have a formal inventory.",-2,You cannot protect what you don't know you have. This is a foundational security failure.
+Standard ITIVA Assessment,10,"Yes, we use WPA3/WPA2-Enterprise with separate, secure networks for guests and internal staff.",2,"The highest standard for wireless security, providing robust protection and network segmentation."
+Standard ITIVA Assessment,10,"Yes, we use WPA2 or WPA3 with a strong, complex password.",1,A strong and necessary security control for any modern business network.
+Standard ITIVA Assessment,10,"We use WPA2 but with a simple, easily guessable password.",-1,"The password becomes the weak link, making the network vulnerable to brute-force attacks."
+Standard ITIVA Assessment,10,Our Wi-Fi uses outdated WEP encryption or is open (no password).,-2,"A critical vulnerability. WEP is easily cracked, and an open network allows anyone to connect."
+Standard ITIVA Assessment,10,I don't know the configuration of our Wi-Fi.,-1,"Lack of knowledge implies lack of control, and the network could be in a highly vulnerable state."
+Standard ITIVA Assessment,11,"Yes, all default passwords have been changed, and we use a password manager to store strong, unique credentials.",2,Excellent security hygiene that prevents unauthorized access to network infrastructure.
+Standard ITIVA Assessment,11,"Yes, all default passwords have been changed to a custom password.",1,A fundamental and necessary security step for any network device.
+Standard ITIVA Assessment,11,"Some devices have been updated, but others may still use default passwords.",-1,An attacker who gains access to the network can easily find and compromise these devices.
+Standard ITIVA Assessment,11,We are still using the default 'admin/password' on our network devices.,-2,A critical risk. Default credentials are the first thing an attacker will try.
+Standard ITIVA Assessment,11,I don't know.,-1,Indicates a lack of basic network management and a high probability of vulnerable devices.
+Standard ITIVA Assessment,12,"Yes, we have a strict BYOD policy that requires security checks and management software on personal devices.",2,A mature approach that manages the risks associated with personal devices.
+Standard ITIVA Assessment,12,"Yes, we have a policy that outlines acceptable use for personal devices.",1,A good first step in setting expectations and establishing liability.
+Standard ITIVA Assessment,12,"We allow it, but we have no formal policy in place.",-1,Unmanaged and unknown devices on the network represent a significant security risk.
+Standard ITIVA Assessment,12,"We actively discourage it, but we don't enforce it.",0,"While safer, it may not be practical and doesn't address unauthorized connections."
+Standard ITIVA Assessment,12,I don't know.,-1,Lack of a policy indicates a lack of control over what connects to the network.
+Standard ITIVA Assessment,13,"Yes, we use VLANs or physical segmentation to create separate zones for servers, users, and guests.",2,A core security principle that contains breaches and prevents lateral movement by attackers.
+Standard ITIVA Assessment,13,"Yes, we have a separate Wi-Fi network for guests.",1,"A good, basic form of segmentation that protects the internal network from guests."
+Standard ITIVA Assessment,13,"No, all devices are on one single, flat network.",-2,"A high-risk architecture. If one device is compromised, the entire network is at risk."
+Standard ITIVA Assessment,13,We are not sure what network segmentation is.,-1,Indicates a lack of understanding of fundamental network security concepts.
+Standard ITIVA Assessment,13,I don't know.,-1,Lack of awareness suggests the network is likely flat and highly vulnerable.
+Standard ITIVA Assessment,14,"Yes, a centrally managed, enterprise-grade solution is deployed on all endpoints and updated automatically.",2,"The best practice for endpoint security, providing proactive and manageable protection."
+Standard ITIVA Assessment,14,"Yes, individual licensed anti-malware software is installed on all devices.",1,A good security measure ensuring all devices have a baseline of protection.
+Standard ITIVA Assessment,14,"Only on some devices, or we rely on free versions.",-1,Inconsistent coverage creates unprotected entry points for malware into your network.
+Standard ITIVA Assessment,14,We rely only on the default protection built into the operating system.,-1,"OS protection is basic and often insufficient against modern, sophisticated threats."
+Standard ITIVA Assessment,14,"No, we do not actively use anti-malware software.",-2,A critical vulnerability that leaves all endpoints exposed to malware infections.
+Standard ITIVA Assessment,15,"Yes, we have a properly configured hardware firewall with specific inbound and outbound rules.",2,A robust network defense that provides granular control over traffic.
+Standard ITIVA Assessment,15,"Yes, we use the software firewalls on our individual computers and servers.",1,"A good baseline, but offers no centralized control or protection against internal threats."
+Standard ITIVA Assessment,15,We rely on the default firewall in our internet router.,0,Provides basic protection but lacks the advanced features of a dedicated firewall.
+Standard ITIVA Assessment,15,Our firewall is disabled or has a policy to 'allow all' traffic.,-2,"A critical risk, leaving the network wide open to external scans and attacks."
+Standard ITIVA Assessment,15,I don't know.,-1,Indicates a lack of visibility and control over the network's perimeter security.
+Standard ITIVA Assessment,16,"Yes, it is reviewed annually, communicated to all staff, and employees are trained on it.",2,A mature approach that embeds security into the company culture.
+Standard ITIVA Assessment,16,"Yes, we have a documented policy that is available to employees.",1,A foundational element of any security program.
+Standard ITIVA Assessment,16,We have an informal or outdated policy.,0,"Better than nothing, but informal policies are inconsistently applied and hard to enforce."
+Standard ITIVA Assessment,16,I don't know.,-1,Indicates a lack of governance and a reactive approach to security.
+Standard ITIVA Assessment,16,"No, we do not have a documented policy.",-2,A fundamental failure in governance. There are no defined rules for security.
+Standard ITIVA Assessment,17,"Yes, it's aligned with regulations (like GDPR/NDPR), defines data types, and dictates handling procedures.",2,Best practice for ensuring both compliance and a clear understanding of data handling responsibilities.
+Standard ITIVA Assessment,17,"Yes, we have a basic document outlining data privacy.",1,A good first step towards formalizing data protection.
+Standard ITIVA Assessment,17,We handle it based on common sense but have no formal policy.,-1,Inconsistent and subjective data handling leads to mistakes and potential breaches.
+Standard ITIVA Assessment,17,I don't know.,-1,"A significant governance gap, especially if handling customer data."
+Standard ITIVA Assessment,17,"No, we have no formal policy on data protection.",-2,"A critical compliance and security risk, showing a disregard for data privacy."
+Standard ITIVA Assessment,18,"Yes, it is documented, contains key contacts, and we test it with drills at least annually.",2,"The gold standard. A tested plan ensures an effective, coordinated response during a crisis."
+Standard ITIVA Assessment,18,"Yes, we have a documented plan outlining the steps to take.",1,"A necessary component of security management, providing a roadmap for crisis."
+Standard ITIVA Assessment,18,We have some informal notes or an idea of who to call.,-1,"An informal plan will fail under the pressure of a real incident, leading to chaos and increased damage."
+Standard ITIVA Assessment,18,I don't know what an Incident Response Plan is.,-1,Indicates a lack of preparedness for the most basic security inevitabilities.
+Standard ITIVA Assessment,18,"No, we have no plan for security incidents.",-2,A critical failure. The damage from a breach will be significantly worse without a plan.
+Standard ITIVA Assessment,19,"Yes, it's enforced via system settings and requires MFA, length, complexity, and rotation.",2,A mature and proactive approach to enforcing strong authentication.
+Standard ITIVA Assessment,19,"Yes, we have a written policy that encourages strong passwords.",1,A good practice that sets clear expectations for employees.
+Standard ITIVA Assessment,19,We just tell our employees to use 'strong' passwords.,0,"Offers guidance but no enforcement, resulting in inconsistent password strength."
+Standard ITIVA Assessment,19,We have no policy regarding passwords.,-2,"A significant risk, leading to widespread use of weak, easily compromised passwords."
+Standard ITIVA Assessment,19,I don't know.,-1,Lack of a policy implies a lack of basic security governance.
+Standard ITIVA Assessment,20,"Yes, all employees read and sign it as part of their onboarding.",2,Ensures that employees are aware of their responsibilities and the organization has legal recourse.
+Standard ITIVA Assessment,20,"Yes, we have one documented and available.",1,A foundational governance document.
+Standard ITIVA Assessment,20,It's an unwritten rule that people generally understand.,0,Unwritten rules are not enforceable and lead to inconsistent behavior.
+Standard ITIVA Assessment,20,"No, there are no rules on how employees use company tech.",-2,A significant risk that can lead to misuse of assets and internal threats.
+Standard ITIVA Assessment,20,I don't know.,-1,Indicates a lack of basic IT governance.
+Standard ITIVA Assessment,21,"Yes, we have had a formal audit or review to ensure full compliance.",2,Demonstrates due diligence and a proactive stance on compliance.
+Standard ITIVA Assessment,21,"Yes, we have reviewed the regulations and believe we are compliant.",1,"A good faith effort, but may contain gaps without a formal review."
+Standard ITIVA Assessment,21,We are aware of the regulations but have not taken formal steps.,-1,Awareness without action is a significant legal and financial risk.
+Standard ITIVA Assessment,21,We are not aware of any regulations that apply to us.,-2,Willful ignorance is not a defense and represents a major compliance risk.
+Standard ITIVA Assessment,21,I don't know.,-1,"A significant risk, as non-compliance can lead to heavy fines and reputational damage."
+Standard ITIVA Assessment,22,"Yes, we have a managed IDS/IPS that is monitored and alerts our security team.",2,A proactive security measure that allows for rapid detection and response to threats.
+Standard ITIVA Assessment,22,"Yes, we have an IDS/IPS device or software running.",1,A good security control that provides visibility into network threats.
+Standard ITIVA Assessment,22,We are planning to implement one.,0,Awareness without implementation provides no security benefit.
+Standard ITIVA Assessment,22,I don't know what an IDS/IPS is.,-1,Indicates a lack of knowledge about modern network security technologies.
+Standard ITIVA Assessment,22,"No, we do not use IDS or IPS.",-2,The network is blind to active threats and ongoing attacks.
+Standard ITIVA Assessment,23,"Yes, we have a SIEM that aggregates logs from all critical systems and has rules for threat detection.",2,"The best practice for security visibility, enabling rapid threat detection and investigation."
+Standard ITIVA Assessment,23,"Yes, we collect logs from some systems but analysis is manual and infrequent.",1,"A good start, but manual analysis is not scalable or effective for real-time threat detection."
+Standard ITIVA Assessment,23,We keep logs on individual devices but do not centralize them.,-1,"Useless for incident response, as correlating events across devices is nearly impossible."
+Standard ITIVA Assessment,23,We do not collect or review security logs.,-2,A critical visibility gap. You cannot investigate or learn from a breach without logs.
+Standard ITIVA Assessment,23,I don't know what a SIEM is.,-1,Indicates a lack of knowledge about modern security monitoring.
+Standard ITIVA Assessment,24,"Yes, MFA is mandatory for all users on all critical systems, including email and remote access.",2,"The single most effective control to prevent unauthorized access, even if passwords are stolen."
+Standard ITIVA Assessment,24,"Yes, but it is only required for administrative or privileged accounts.",1,A good practice that protects the most powerful accounts.
+Standard ITIVA Assessment,24,It is available but optional for users to enable.,0,"Optional security is rarely used by the majority of users, providing little overall protection."
+Standard ITIVA Assessment,24,We only use it for one or two non-critical applications.,-1,Provides a false sense of security while leaving all critical systems exposed.
+Standard ITIVA Assessment,24,"No, we do not use MFA anywhere.",-2,A critical vulnerability in today's threat landscape. It makes account takeover trivial.
+Standard ITIVA Assessment,25,"Yes, all sensitive data is encrypted at rest (e.g., database encryption) and in transit (SSL/TLS).",2,A comprehensive data protection strategy that protects data from all forms of unauthorized access.
+Standard ITIVA Assessment,25,"Data is encrypted in transit, but not while stored on our servers.",1,"Good security, but leaves data vulnerable if a server or database is compromised."
+Standard ITIVA Assessment,25,Only some of our sensitive data is encrypted.,-1,Inconsistent encryption leaves sensitive data exposed.
+Standard ITIVA Assessment,25,I don't know if or how our data is encrypted.,-1,"A significant risk, as you cannot confirm that sensitive data is protected."
+Standard ITIVA Assessment,25,"No, we do not use encryption.",-2,A critical flaw that exposes all sensitive data to interception and direct access.
+Standard ITIVA Assessment,26,"Yes, we conduct regular automated scans and an annual third-party penetration test.",2,"A mature, proactive approach to identifying and remediating vulnerabilities."
+Standard ITIVA Assessment,26,"Yes, we perform periodic automated vulnerability scans on our network.",1,A good practice for proactively identifying security weaknesses.
+Standard ITIVA Assessment,26,"We have done a scan once in the past, but not regularly.",0,A one-time snapshot that is now outdated and provides a false sense of security.
+Standard ITIVA Assessment,26,I don't know.,-1,Indicates a lack of awareness of fundamental security assurance practices.
+Standard ITIVA Assessment,26,"No, we have never performed scans or tests.",-2,A purely reactive security posture. You will only find vulnerabilities when they are exploited by attackers.
+Standard ITIVA Assessment,27,"Yes, all employees undergo mandatory annual training with periodic phishing simulations.",2,The most effective way to build a human firewall and defend against social engineering.
+Standard ITIVA Assessment,27,"Yes, new employees receive some security training during onboarding.",1,"A good first step, but security knowledge becomes outdated without regular reinforcement."
+Standard ITIVA Assessment,27,We occasionally send out an email reminder about security.,-1,Ineffective and insufficient for creating a security-aware culture.
+Standard ITIVA Assessment,27,"No, we believe our employees already know how to be secure.",-1,A dangerous assumption that ignores the fact that employees are the primary target of attackers.
+Standard ITIVA Assessment,27,"No, we do not provide any security training.",-2,A critical gap that makes the organization highly vulnerable to phishing and other social engineering attacks.
+Standard ITIVA Assessment,28,"Yes, we have a strict policy that requires professional data destruction and/or physical destruction of drives.",2,A comprehensive process that ensures sensitive data does not leave the organization on old equipment.
+Standard ITIVA Assessment,28,"Yes, we wipe the hard drives before disposing of old computers.",1,A good practice that prevents casual data recovery from disposed drives.
+Standard ITIVA Assessment,28,We just delete the files before giving the hardware away.,-2,A significant risk. Deleted files are easily recoverable with free software.
+Standard ITIVA Assessment,28,We throw old computers in the trash without any data wiping.,-2,A critical data leakage risk. This is equivalent to handing your data to strangers.
+Standard ITIVA Assessment,28,I don't know what happens to old hardware.,-1,Indicates a lack of control and a high probability of data leakage.
+Standard ITIVA Assessment,29,"Yes, we use an automated patch management system that applies critical patches within days.",2,"A mature, proactive process that minimizes the window of exploitation for new vulnerabilities."
+Standard ITIVA Assessment,29,"Yes, we have a manual process to check for and apply patches monthly.",1,"A good, disciplined process, though slower than automated systems."
+Standard ITIVA Assessment,29,We only patch systems when we encounter a problem.,-1,A reactive 'break-fix' approach that guarantees systems remain vulnerable for long periods.
+Standard ITIVA Assessment,29,We do not have a formal patching process.,-2,"A critical failure in security maintenance, leading to a build-up of easily exploitable vulnerabilities."
+Standard ITIVA Assessment,29,I don't know.,-1,"A significant operational risk, as unpatched systems are a primary target for attackers."
+Standard ITIVA Assessment,30,"Yes, access rights are strictly controlled and regularly reviewed based on job roles.",2,"The gold standard for access control, minimizing the potential impact of any single account compromise."
+Standard ITIVA Assessment,30,"Yes, we have different levels of access for different groups of employees.",1,"A good, foundational access control model."
+Standard ITIVA Assessment,30,"Access is granted on request, but rarely revoked or reviewed.",-1,"Known as 'privilege creep,' this creates a massive internal attack surface over time."
+Standard ITIVA Assessment,30,Most employees have access to most data.,-2,A critical risk. A compromise of any user account could lead to a full company data breach.
+Standard ITIVA Assessment,30,I don't know.,-1,"Indicates a lack of basic access control, a fundamental security principle."
+Advanced Cloud Security Check,1,"We use a dedicated secrets management service (e.g., AWS Secrets Manager, HashiCorp Vault) with automated key rotation.",2,"Best practice. Centralizes secrets, controls access, and automates rotation to minimize exposure."
+Advanced Cloud Security Check,1,Keys are stored as environment variables on servers and rotated manually every 90 days.,1,"A good, common practice, but manual rotation can be forgotten and keys can be exposed in logs."
+Advanced Cloud Security Check,1,Keys are stored in private code repositories or configuration files.,-1,High risk. Exposes credentials to anyone with code access and makes rotation very difficult.
+Advanced Cloud Security Check,1,Keys are hardcoded directly into the application source code.,-2,"Critical vulnerability. Leaking code means leaking all credentials, with no easy way to revoke them."
+Advanced Cloud Security Check,1,We use the same long-lived key for all services.,-2,Extremely high risk. A single key compromise gives an attacker access to everything.
+Advanced Cloud Security Check,2,"We use a multi-tiered VPC architecture with strict, least-privilege security groups and network ACLs for defense-in-depth.",2,Excellent. This layered defense model isolates resources and significantly limits an attacker's movement.
+Advanced Cloud Security Check,2,We use a single VPC with security groups configured to allow traffic only from specific known IP addresses.,1,"Good control, but a flat network within the VPC means a compromised server can attack others."
+Advanced Cloud Security Check,2,"We use a default VPC and rely on the default security group settings, which are somewhat permissive.",0,A neutral but risky state. Default settings are often too open for production workloads.
+Advanced Cloud Security Check,2,Our security groups are configured to allow all traffic (0.0.0.0/0) on most ports for ease of access.,-2,Critical misconfiguration. Exposes all services on the instance to the entire internet.
+Advanced Cloud Security Check,2,We don't use VPCs or security groups.,-2,This implies using legacy cloud services (like EC2-Classic) which is a major security risk.
+Advanced Cloud Security Check,3,All data is encrypted at rest by default using customer-managed keys (CMK) with a defined key rotation policy.,2,Best practice. Provides maximum control and auditability over data encryption.
+Advanced Cloud Security Check,3,All data is encrypted at rest using the cloud provider's default managed keys.,1,"Good security posture. The data is protected, though with less granular control than CMKs."
+Advanced Cloud Security Check,3,Only buckets/volumes containing known sensitive data are manually configured for encryption.,-1,"Risky approach. Relies on humans to correctly identify all sensitive data, which is prone to error."
+Advanced Cloud Security Check,3,"We rely on the default settings, which may or may not include encryption.",-1,"Dangerous assumption. Many older services do not encrypt by default, leaving data exposed."
+Advanced Cloud Security check,3,We do not encrypt data stored in the cloud.,-2,Critical vulnerability. A breach of the storage system would expose all data in plaintext.
+Advanced Cloud Security Check,4,"Yes, logging is enabled for all services in all regions, aggregated to a central, tamper-proof account, with alerts on suspicious API calls.",2,Gold standard for cloud visibility and incident response readiness.
+Advanced Cloud Security Check,4,"Logging is enabled for most critical services, and logs are reviewed manually during an incident.",1,"Good, but reactive. Lacks the proactive alerting needed to catch threats in real-time."
+Advanced Cloud Security Check,4,Logging is enabled but logs are stored in the same account and are not centrally managed or monitored.,0,Logs are available but can be tampered with by an attacker who compromises the account.
+Advanced Cloud Security Check,4,"Logging is enabled on only a few services, or we use the default settings.",-1,Major blind spots. You cannot investigate what you do not log.
+Advanced Cloud Security Check,4,Logging is disabled to save costs.,-2,Critical visibility gap. Makes effective incident response nearly impossible.
+Advanced Cloud Security Check,5,"IAM roles with granular, resource-specific permissions are used for all human and machine access. Permissions are reviewed quarterly.",2,"Excellent. A mature implementation of least privilege, reducing the blast radius of a compromise."
+Advanced Cloud Security Check,5,"We use IAM groups with broad policies (e.g., PowerUser, ReadOnly) assigned to users.",1,"A good start, but broad policies often grant more permissions than necessary."
+Advanced Cloud Security Check,5,"We attach policies directly to individual IAM users as needed, but rarely review or remove them.",-1,Leads to 'privilege creep' where users accumulate excessive permissions over time.
+Advanced DCloud Security Check,5,Most developers and services use an IAM user with full administrator access for convenience.,-2,Critical risk. A compromise of any one of these users/services leads to a full environment compromise.
+Advanced Cloud Security Check,5,We use the root account for all daily operations.,-2,Extremely dangerous practice. The root account should be locked away and never used for operational tasks.
+Advanced Cloud Security Check,6,"We have an automated CI/CD pipeline that scans all container images and AMIs for vulnerabilities before deployment, blocking critical findings.",2,Best practice 'shift-left' security. Prevents vulnerabilities from ever reaching production.
+Advanced Cloud Security Check,6,We run weekly automated vulnerability scans on all running instances and container repositories.,1,"Good detective control, but it means vulnerable systems may be live for up to a week."
+Advanced Cloud Security Check,6,"We perform manual, ad-hoc vulnerability scans on our primary production servers a few times a year.",0,Infrequent scanning provides a poor and outdated picture of the actual risk.
+Advanced Cloud Security Check,6,We rely on the security of the base images provided by the cloud provider or Docker Hub.,-1,Base images can contain vulnerabilities or become outdated. They must be scanned.
+Advanced Cloud Security Check,6,We do not perform vulnerability scanning on our cloud workloads.,-2,Critical gap. Leaves systems exposed to well-known and easily exploitable vulnerabilities.
+Advanced Cloud Security Check,7,"We use a managed DDoS protection service (e.g., AWS Shield Advanced, Azure DDoS Protection Standard) combined with a WAF and a CDN.",2,"A robust, multi-layered defense against volumetric and application-layer DDoS attacks."
+Advanced Cloud Security Check,7,"We rely on the standard, default DDoS protection included with our cloud provider's services.",1,"Provides protection against common, large-scale attacks but not sophisticated application-layer attacks."
+Advanced Cloud Security Check,7,"We have a WAF, but no specific, advanced DDoS mitigation service.",1,A WAF helps with application-layer attacks but may not be sufficient for large volumetric attacks.
+Advanced Cloud Security Check,7,We have no specific DDoS protection in place.,-1,"High risk for any public-facing application, as even small DDoS attacks can cause an outage."
+Advanced Cloud Security Check,7,We are not sure what DDoS protection is.,-2,Lack of awareness of a common and impactful threat is a major business risk.
+Advanced Cloud Security Check,8,All third-party software from marketplaces undergoes a security review and is deployed in an isolated environment before production use.,2,A mature supply chain security process that minimizes risk from external code.
+Advanced Cloud Security Check,8,"We only use software from well-known, reputable vendors found on the official cloud marketplace.",1,"A good practice, but even reputable software can have vulnerabilities."
+Advanced Cloud Security Check,8,"We allow developers to use any third-party software they need to get their job done, without a formal review process.",-1,High risk. Introduces unknown and unvetted code into your secure environment.
+Advanced Cloud Security Check,8,We are not aware of any third-party software running in our environment.,-1,Lack of awareness is a risk. It's likely third-party code exists in dependencies.
+Advanced Cloud Security Check,8,We do not use any third-party software.,0,"Unlikely in modern development, but if true, it reduces this specific risk vector."
+Advanced Cloud Security Check,9,"Databases are deployed in private subnets, require SSL/TLS for connections, have encryption at rest enabled, and use granular IAM database authentication.",2,Excellent layered security model for protecting critical data stores.
+Advanced Cloud Security Check,9,Databases are in private subnets with access restricted by security groups to specific application servers.,1,"Good network-level protection, but lacks other defense-in-depth measures like IAM auth."
+Advanced Cloud Security Check,9,Databases are publicly accessible but are protected by a strong password.,-1,High risk. Exposes the database to brute-force attacks and potential zero-day vulnerabilities from the internet.
+Advanced Cloud Security Check,9,Databases are publicly accessible and use default port numbers with simple passwords.,-2,Critical misconfiguration. It is highly likely the database will be compromised.
+Advanced Cloud Security Check,9,We are not sure how our databases are configured.,-1,Lack of awareness of the configuration of a critical asset is a major security risk.
+Advanced Cloud Security Check,10,We use automated static analysis security testing (SAST) tools in our CI/CD pipeline to scan IaC templates for misconfigurations before deployment.,2,Best practice. Automates security and prevents misconfigurations from being deployed.
+Advanced Cloud Security Check,10,We have a manual peer-review process for all infrastructure code changes to look for potential security issues.,1,"Good practice, but prone to human error and less scalable than automated tools."
+Advanced Cloud Security Check,10,We use IaC but do not have a specific security review process for the templates.,-1,High risk. This can lead to the repeatable deployment of insecure infrastructure.
+Advanced Cloud Security Check,10,We make changes to our cloud infrastructure manually through the web console.,-1,"Manual changes are error-prone, lack auditability, and lead to configuration drift."
+Advanced Cloud Security Check,10,We do not use Infrastructure as Code.,0,"Neutral. While not a direct risk, it indicates a lack of maturity in cloud operations."
+Advanced Cloud Security Check,11,"We use runtime security monitoring tools, enforce pod security policies (or equivalents), and run containers as non-root users with read-only filesystems where possible.",2,"A comprehensive, defense-in-depth approach to container security."
+Advanced Cloud Security Check,11,We scan container images for vulnerabilities but do not have specific runtime security monitoring in place.,1,"Good 'shift-left' practice, but doesn't protect against threats that occur at runtime."
+Advanced Cloud Security Check,11,"We run our containers using the default settings provided by the orchestration service (e.g., EKS, AKS).",0,Risky. Default settings are often too permissive for secure production environments.
+Advanced Cloud Security Check,11,Our containers are run with root privileges for maximum compatibility.,-2,Critical risk. A container escape vulnerability would grant the attacker root access to the host node.
+Advanced Cloud Security Check,11,We do not use containers.,0,Not applicable if containers are not in use.
+Advanced Cloud Security Check,12,"MFA is enforced programmatically for all IAM users and the root account, and console access is federated through a central identity provider requiring MFA.",2,Gold standard for identity and access management in the cloud.
+Advanced Cloud Security Check,12,MFA is enabled and required for all administrative users and the root account.,1,"Good practice that protects the most powerful accounts, but leaves others vulnerable."
+Advanced Cloud Security Check,12,MFA is encouraged for all users but not strictly enforced by policy.,-1,Ineffective. Optional security is rarely adopted and provides a false sense of security.
+Advanced Cloud Security Check,12,Only the root account has MFA enabled.,-2,"Critically insufficient. The root account should not be used for daily tasks, and regular user accounts are left exposed."
+Advanced Cloud Security Check,12,MFA is not used for any account.,-2,Critical vulnerability. Makes password-based attacks like credential stuffing trivial.
+Advanced Cloud Security Check,13,We have a well-documented and tested multi-region DR plan with automated failover for critical services and regular cross-region backup replication.,2,Excellent. A mature and robust plan to ensure business continuity.
+Advanced Cloud Security Check,13,"We have regular backups of our data and infrastructure templates stored in a different region, with a manual recovery process documented.",1,"Good practice. Provides recoverability, though manual processes can be slow and error-prone."
+Advanced Cloud Security Check,13,We have backups stored in the same region as our primary infrastructure.,-1,High risk. A region-wide failure would destroy both the primary infrastructure and the backups.
+Advanced Cloud Security Check,13,We rely on the high availability of a single cloud region to prevent outages.,-2,Critically risky. Single-region high availability does not protect against region-wide disasters or failures.
+Advanced Cloud Security Check,13,We do not have a disaster recovery plan.,-2,A major business risk that threatens the continuity of the entire operation.
+Advanced Cloud Security Check,14,We have a centralized security alerting system (from SIEM/monitoring tools) with automated response actions for common events and a 24/7 on-call rotation.,2,"A mature, proactive security operations model."
+Advanced Cloud Security Check,14,We receive email alerts from cloud security services and respond to them manually during business hours.,1,"Good, but can lead to significant delays in response, especially for overnight incidents."
+Advanced Cloud Security Check,14,We periodically log in to the cloud console to check for any security notifications.,-1,A reactive and ineffective approach. Threats can cause significant damage before being noticed.
+Advanced Cloud Security Check,14,We assume the cloud provider handles all security events.,-2,A critical misunderstanding of the Shared Responsibility Model. The customer is responsible for security *in* the cloud.
+Advanced Cloud Security Check,14,We do not monitor for security events.,-2,"Complete lack of visibility into threats, attacks, and misconfigurations."
+Advanced Cloud Security Check,15,"Each serverless function has a unique IAM execution role with narrowly scoped, least-privilege permissions. Function dependencies are scanned for vulnerabilities.",2,"Excellent. A granular, secure-by-design approach to serverless security."
+Advanced Cloud Security Check,15,"Functions use shared execution roles with broader permissions based on their general purpose (e.g., 'database-access-role').",1,"A common practice, but it often grants functions more permissions than they strictly need."
+Advanced Cloud Security Check,15,"All functions run under a single, highly permissive execution role for simplicity.",-1,High risk. A vulnerability in one function could be exploited to abuse the permissions of all other functions.
+Advanced Cloud Security Check,15,Our functions have administrator-level permissions to avoid any access issues.,-2,Critical risk. A compromise of a single function would lead to a full environment compromise.
+Advanced Cloud Security Check,15,We do not use serverless functions.,0,Not applicable if serverless functions are not in use.
+GDPR Compliance Audit,1,"We have a documented lawful basis for each data processing activity, which is reviewed and included in our privacy notice.",2,Excellent. Demonstrates a clear understanding and implementation of a core GDPR principle.
+GDPR Compliance Audit,1,"We primarily rely on user consent, obtained via clear affirmative action, for all our data processing.",1,"Good, but consent is not always the only or best basis. It's important to understand all six lawful bases."
+GDPR Compliance Audit,1,We process data based on our 'legitimate interests' but have not performed or documented a formal balancing test.,-1,High compliance risk. Using legitimate interests without a documented LIA is not compliant.
+GDPR Compliance Audit,1,We assume we have a right to process the data we collect.,-2,Critical compliance failure. Processing without a lawful basis is a major infringement.
+GDPR Compliance Audit,1,We are not sure what a 'lawful basis' is.,-2,Indicates a fundamental lack of understanding of GDPR requirements.
+GDPR Compliance Audit,2,"We have a clear, documented process and a dedicated contact point for handling data subject requests within the one-month time limit.",2,Best practice. Ensures you can meet your legal obligations efficiently and correctly.
+GDPR Compliance Audit,2,We handle requests on an ad-hoc basis as they come in via email or support tickets.,0,"Risky. An ad-hoc process can easily miss the legal deadline, leading to a compliance breach."
+GDPR Compliance Audit,2,We have received requests but are unsure how to process them or if we have to comply.,-1,High risk of non-compliance. Ignoring or improperly handling requests can lead to complaints and fines.
+GDPR Compliance Audit,2,We tell users we are unable to delete their data.,-2,"A direct violation of data subject rights under GDPR, unless a specific legal exemption applies."
+GDPR Compliance Audit,2,We have never received a data subject request.,0,"Neutral, but it's crucial to have a process in place for when a request is eventually received."
+GDPR Compliance Audit,3,"Yes, we have formally appointed a DPO with the necessary expertise and have registered them with the relevant supervisory authority.",2,"Excellent. Correctly implemented where required, showing mature governance."
+GDPR Compliance Audit,3,"We have assigned data protection responsibilities to an existing employee, but not as a formal DPO role.",1,"A good step, but may not meet the formal requirements if a DPO is mandatory for your organization."
+GDPR Compliance Audit,3,We use an external consultant for data protection advice but have no appointed DPO.,0,"May be compliant if a DPO is not mandatory, but risky if one is required."
+GDPR Compliance Audit,3,We are a small company and believe we do not need a DPO.,-1,"A risky assumption. The need for a DPO is based on processing activities, not just company size."
+GDPR Compliance Audit,3,We do not know what a DPO is.,-2,Indicates a significant gap in understanding GDPR's governance requirements.
+GDPR Compliance Audit,4,We have a formal process where a Data Protection Impact Assessment (DPIA) is conducted for all new projects involving personal data.,2,"Excellent. This embeds privacy into your operations, as required by GDPR."
+GDPR Compliance Audit,4,"We consider privacy during the design phase of new products, but the process is informal.",1,"A good cultural practice, but an informal process can be inconsistent and hard to prove to regulators."
+GDPR Compliance Audit,4,We try to add privacy features after a product has been built if a concern is raised.,-1,A reactive approach that goes against the core principle of 'by Design and by Default'.
+GDPR Compliance Audit,4,We prioritize functionality first and consider privacy only if required by customers.,-2,A direct contradiction of the 'Data Protection by Design' principle.
+GDPR Compliance Audit,4,We are not familiar with this principle.,-2,A fundamental gap in knowledge of GDPR's core operational requirements.
+GDPR Compliance Audit,5,"We have a documented internal procedure for assessing and reporting breaches to the supervisory authority within 72 hours, as part of our Incident Response Plan.",2,Best practice. Ensures you can meet the tight and mandatory reporting deadline.
+GDPR Compliance Audit,5,We know we need to report breaches and would contact our legal advisor to do so if one occurred.,1,"Good awareness, but not having a pre-defined internal process can cause critical delays."
+GDPR Compliance Audit,5,We would only report a breach if it was very large or if customers complained.,-2,"Non-compliant. All breaches posing a risk to individuals must be reported, not just large ones."
+GDPR Compliance Audit,5,We believe we are not required to report data breaches.,-2,"A critical misunderstanding of GDPR obligations, which can lead to significant fines."
+GDPR Compliance Audit,5,We do not have a process for this.,-1,"High risk. Without a process, meeting the 72-hour deadline is nearly impossible."
+GDPR Compliance Audit,6,"Yes, we maintain a comprehensive and up-to-date RoPA that is regularly reviewed and made available to supervisory authorities upon request.",2,"Excellent. This meets a core, mandatory documentation requirement of GDPR."
+GDPR Compliance Audit,6,"We have a spreadsheet that lists our main data processing activities, but it is not fully detailed or regularly updated.",1,"A good start, but an incomplete or outdated RoPA does not meet the legal requirement."
+GDPR Compliance Audit,6,"We have some documentation on data flows for specific projects, but not a central record.",-1,"Insufficient. GDPR requires a central, comprehensive Record of Processing Activities."
+GDPR Compliance Audit,6,We do not maintain a record of our processing activities.,-2,A direct breach of a mandatory GDPR documentation requirement (Article 30).
+GDPR Compliance Audit,6,We do not know what a RoPA is.,-2,A critical knowledge gap regarding a key GDPR accountability obligation.
+GDPR Compliance Audit,7,"We have signed Data Processing Agreements (DPAs) with all third-party vendors, and we conduct periodic reviews of their security and compliance measures.",2,"A mature, best-practice approach to managing supply chain and data processor risk."
+GDPR Compliance Audit,7,We have DPAs in place with our major vendors.,1,"Good practice, but GDPR requires a DPA with *all* processors, not just major ones."
+GDPR Compliance Audit,7,"We check the vendor's privacy policy before using their service, but do not have formal agreements.",-1,Insufficient. A privacy policy is not a substitute for a legally binding DPA.
+GDPR Compliance Audit,7,We use vendors without a formal data protection review process.,-2,High risk. You are liable for breaches caused by your data processors if you haven't performed due diligence.
+GDPR Compliance Audit,7,We do not share personal data with any third-party vendors.,0,"Reduces this specific risk, but this is rare for modern businesses."
+GDPR Compliance Audit,8,"All international data transfers are mapped and conducted using a valid transfer mechanism, such as the UK's International Data Transfer Agreement or Adequacy decisions.",2,Excellent. Demonstrates a clear and compliant approach to a complex area of GDPR.
+GDPR Compliance Audit,8,"We are aware some of our vendors are outside the UK/EEA and believe they are compliant, but have not documented the transfer mechanism.",-1,"Belief is not sufficient for compliance. You must have a valid, documented transfer mechanism in place."
+GDPR Compliance Audit,8,"We transfer data to vendors globally without a specific legal mechanism in place, assuming it's okay.",-2,A direct breach of GDPR's rules on international data transfers.
+GDPR Compliance Audit,8,We are not sure where our data is stored or transferred.,-1,A significant governance failure. You must know where the personal data you control is going.
+GDPR Compliance Audit,8,We do not transfer any data internationally.,0,"Simplifies compliance, but ensure this is accurate (e.g., check where your cloud provider stores data)."
+GDPR Compliance Audit,9,"We have a data retention policy with specific periods for all categories of personal data, and an automated process for deletion or anonymization.",2,Best practice. This operationalizes the GDPR principle of storage limitation.
+GDPR Compliance Audit,9,We have general guidelines for data retention but the deletion process is manual and ad-hoc.,1,"A good start, but a manual process is prone to error and data being kept for too long."
+GDPR Compliance Audit,9,We keep most data indefinitely unless a user specifically asks for it to be deleted.,-2,A direct violation of the storage limitation principle. Data should not be kept forever 'just in case'.
+GDPR Compliance Audit,9,We have never deleted any personal data we have collected.,-2,This indicates a systemic failure to comply with the storage limitation principle.
+GDPR Compliance Audit,9,We do not have a data retention policy.,-1,High compliance risk. You must be able to justify why you are still holding personal data.
+GDPR Compliance Audit,10,"Our privacy notice is written in plain language, easily accessible from all data collection points, and reviewed regularly for accuracy and compliance.",2,Excellent. This meets the GDPR requirements for transparency and accessibility.
+GDPR Compliance Audit,10,We have a comprehensive privacy policy linked in our website footer.,1,"Good, but must also be actively provided at the point of data collection ('just-in-time' notice)."
+GDPR Compliance Audit,10,Our privacy policy is a long legal document that is difficult for a non-lawyer to understand.,-1,"Fails the GDPR requirement for information to be provided in 'a concise, transparent, intelligible and easily accessible form, using clear and plain language'."
+GDPR Compliance Audit,10,We do not have a privacy notice or policy.,-2,A critical compliance failure that violates the core principle of transparency.
+GDPR Compliance Audit,10,We use a generic privacy policy template we found online.,-1,High risk. A template is not specific to your data processing activities and is likely non-compliant.

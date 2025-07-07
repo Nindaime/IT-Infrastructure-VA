@@ -4,12 +4,12 @@ navigation, answer selection, and the lifecycle of a draft session. It interacts
 with both the assessmentStore (for the active session) and the reportsStore (for
 saving/updating the draft in the user's main list).  -->
 <script setup>
-import { ref, computed, onMounted, onBeforeUnmount, inject } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, inject, watch, nextTick } from 'vue'
 import { useRouter, useRoute, onBeforeRouteLeave, onBeforeRouteUpdate } from 'vue-router'
-import { fullQuestionnaireData } from '@/api/mockData' // Using the new detailed questionnaire data
 import { useReportsStore } from '@/stores/reports' // Import the reports store
 import { useAssessmentStore } from '@/stores/assessment' // Import the assessment store
 import { useAuthStore } from '@/stores/auth' // Import the auth store
+import { useQuestionnairesStore } from '@/stores/questionnaires'
 import AppHeader from '@/components/AppHeader.vue'
 import AppFooter from '@/components/AppFooter.vue'
 import DraftSaveModal from '@/components/DraftSaveModal.vue'
@@ -18,14 +18,8 @@ const router = useRouter()
 const route = useRoute()
 
 // --- State Management ---
-const questions = ref(fullQuestionnaireData)
-const answers = ref(
-  // Initialize answers object with empty strings for each question ID
-  questions.value.reduce((acc, q) => {
-    acc[q.id] = null
-    return acc
-  }, {}),
-)
+const questions = ref([])
+const answers = ref({})
 const currentQuestionIndex = ref(0)
 const isLoading = ref(false)
 const showSuccessModal = ref(false)
@@ -35,6 +29,7 @@ const showDraftSaveModal = ref(false)
 const newReportName = ref('')
 const targetAssessmentType = ref('')
 const pendingNavigation = ref(null)
+const reportNameInput = ref(null) // Template ref for the report name input
 const isNavigatingAfterSubmit = ref(false) // Flag to bypass the leave guard on successful submission
 
 // Enhanced UX states
@@ -45,6 +40,7 @@ const showKeyboardHelp = ref(true) // Set to true to always show help
 const authStore = useAuthStore()
 const assessmentStore = useAssessmentStore()
 const reportsStore = useReportsStore()
+const questionnairesStore = useQuestionnairesStore()
 
 // Get toast functions
 const showToast = inject('showToast')
@@ -59,10 +55,16 @@ const draftNameToSave = computed(() => {
   return assessmentStore.currentDraft?.name || ''
 })
 
-const assessmentType = ref('') // Will be set from route params
+// Watch for the report name modal to open and focus the input
+watch(showReportNameModal, (newValue) => {
+  if (newValue) {
+    nextTick(() => {
+      reportNameInput.value?.focus()
+    })
+  }
+})
 
-// Add original index to each question for robust progress calculation
-const questionsWithIndex = ref(questions.value.map((q, index) => ({ ...q, originalIndex: index })))
+const assessmentType = ref('') // Will be set from route params
 
 // Define styles for each category progress bar for better visual distinction
 const categoryStyles = {
@@ -70,9 +72,21 @@ const categoryStyles = {
   'Devices & Network': { color: 'bg-green-500' },
   'Compliance Documentation': { color: 'bg-yellow-500' },
   'Cyber Security Implementations': { color: 'bg-red-500' },
+  // New categories for Advanced Cloud Security
+  'Access Management': { color: 'bg-indigo-500' },
+  'Data Protection': { color: 'bg-purple-500' },
+  'Infrastructure Security': { color: 'bg-pink-500' },
+  // New categories for GDPR
+  'Data Governance': { color: 'bg-teal-500' },
+  'Operational Compliance': { color: 'bg-cyan-600' },
 }
 const defaultCategoryStyle = { color: 'bg-gray-500' }
 
+// This computed property ensures that when `questions.value` is filtered,
+// this list is also updated. It's crucial for the progress bar logic.
+const questionsWithIndex = computed(() =>
+  questions.value.map((q, index) => ({ ...q, originalIndex: index })),
+)
 // --- Lifecycle Hooks ---
 /**
  * Initializes the assessment state based on the route. It either continues
@@ -119,7 +133,7 @@ async function handleDraftSave(draftName) {
         ...assessmentStore.currentDraft,
         // Ensure date exists. If the draft is new, create a date. If it's being
         // continued, its original date will be preserved from the spread.
-        date: assessmentStore.currentDraft.date || new Date().toISOString().split('T')[0],
+        date: assessmentStore.currentDraft.date || new Date().toISOString(),
         name: draftName, // Update the name
         // Use lastModified for drafts to track the latest save time for sorting.
         // The original 'date' property should represent the creation date.
@@ -238,10 +252,13 @@ const isFirstQuestion = computed(() => currentQuestionIndex.value === 0)
 const questionsByCategory = computed(() => {
   // Group questions by category using the indexed list
   return questionsWithIndex.value.reduce((acc, question) => {
-    if (!acc[question.category]) {
-      acc[question.category] = []
+    // Trim the category name to remove any leading/trailing whitespace,
+    // ensuring it correctly matches the keys in the categoryStyles object.
+    const categoryKey = question.category.trim()
+    if (!acc[categoryKey]) {
+      acc[categoryKey] = []
     }
-    acc[question.category].push(question)
+    acc[categoryKey].push(question)
     return acc
   }, {})
 })
@@ -287,9 +304,9 @@ function getCategoryProgress(categoryName) {
  */
 function generateReportFromAnswers() {
   const allRecommendations = []
-  const categoryResults = {}
-
-  console.log('--- Generating Report from Answers ---')
+  const categoryScores = []
+  let totalOverallScore = 0
+  let categoryCount = 0
 
   // Group questions by category first
   const questionsByCategory = questions.value.reduce((acc, q) => {
@@ -307,14 +324,10 @@ function generateReportFromAnswers() {
     const maxImpactPerQuestion = 100 / questionCount
     let categoryTotalScore = 0
 
-    console.log(
-      `Processing category: "${categoryName}" with ${questionCount} questions. Max impact/q: ${maxImpactPerQuestion.toFixed(2)}`,
-    )
-
     categoryQuestions.forEach((q) => {
       const selectedOption = answers.value[q.id]
       let questionScore = 0 // Default score if no valid answer
-      const impactValue = selectedOption ? parseFloat(selectedOption.score) : NaN
+      const impactValue = selectedOption ? parseFloat(selectedOption.score) : 0
 
       // Check if the parsed impact is a valid number
       if (!isNaN(impactValue)) {
@@ -323,7 +336,7 @@ function generateReportFromAnswers() {
         questionScore = normalizedImpact * maxImpactPerQuestion
 
         // If the answer is not perfect, generate a recommendation
-        if (impactValue < 2) {
+        if (impactValue < 2 && selectedOption.recommendation) {
           allRecommendations.push({
             text: selectedOption.recommendation,
             category: q.category,
@@ -335,23 +348,31 @@ function generateReportFromAnswers() {
       categoryTotalScore += questionScore
     })
 
-    categoryResults[categoryName] = Math.round(categoryTotalScore)
+    const finalCategoryScore = Math.round(categoryTotalScore)
+    categoryScores.push({ name: categoryName, score: finalCategoryScore })
+    totalOverallScore += finalCategoryScore
+    categoryCount++
   }
 
   // Sort recommendations by the highest impact (most points lost) and take the top 3
   const fullRecommendations = allRecommendations.sort((a, b) => b.impactScore - a.impactScore)
 
-  const ws = categoryResults['Website Strength'] || 0
-  const dn = categoryResults['Devices & Network'] || 0
-  const cd = categoryResults['Compliance Documentation'] || 0
-  const cs = categoryResults['Cyber Security Implementations'] || 0
-  const overall = Math.round((ws + dn + cd + cs) / 4)
+  const overall = categoryCount > 0 ? Math.round(totalOverallScore / categoryCount) : 0
 
-  return { overall, ws, dn, cd, cs, recommendations: fullRecommendations }
+  return { overall, categoryScores, recommendations: fullRecommendations }
 }
 
 function resetStateAndStartNewDraft(type) {
-  questions.value = fullQuestionnaireData // Reset to full questionnaire
+  // Filter questions based on the selected assessment type
+  questions.value = questionnairesStore.allQuestions
+    .filter((q) => q.assessment_name === type)
+    .sort((a, b) => {
+      // First, sort by category alphabetically
+      const categoryComparison = a.category.localeCompare(b.category)
+      if (categoryComparison !== 0) return categoryComparison
+      // If categories are the same, sort by ID numerically
+      return a.id - b.id
+    })
   answers.value = questions.value.reduce((acc, q) => ({ ...acc, [q.id]: null }), {})
   currentQuestionIndex.value = 0
   assessmentStore.startDraft(type, JSON.parse(JSON.stringify(questions.value)))
@@ -406,7 +427,6 @@ async function handleReportNameSubmission() {
 
     // Generate report
     const report = generateReportFromAnswers()
-    assessmentStore.setGeneratedReport(report, reportName, assessmentType.value)
 
     // If we are in draft mode, it means we were working on an assessment session
     // that has an ID. We attempt to delete any corresponding entry from the
@@ -419,7 +439,7 @@ async function handleReportNameSubmission() {
     // Add the new, completed report to the reports store.
     const newCompletedReport = reportsStore.addReport({
       name: reportName,
-      date: new Date().toISOString().split('T')[0],
+      date: new Date().toISOString(),
       type: assessmentType.value,
       score: report.overall,
       report: report,
@@ -639,10 +659,35 @@ function handleKeyboardShortcuts(event) {
         <!-- Questionnaire Container -->
         <div class="relative pr-2">
           <transition name="fade" mode="out-in">
-            <div :key="currentQuestion.id">
-              <h2 class="text-xl md:text-2xl font-semibold text-gray-700 mb-6 leading-tight">
-                {{ currentQuestion.text }}
-              </h2>
+            <div :key="currentQuestion.id" v-if="currentQuestion">
+              <div class="flex items-start justify-between gap-4 mb-6">
+                <h2 class="text-xl md:text-2xl font-semibold text-gray-700 leading-tight">
+                  {{ currentQuestion.text }}
+                </h2>
+                <div class="relative group flex-shrink-0">
+                  <svg
+                    class="w-6 h-6 text-gray-400 cursor-pointer group-hover:text-blue-600 transition-colors"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                    xmlns="http://www.w3.org/2000/svg"
+                    aria-hidden="true"
+                  >
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                    ></path>
+                  </svg>
+                  <div
+                    class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-72 p-3 text-sm text-white bg-gray-800 rounded-lg opacity-0 group-hover:opacity-95 transition-opacity duration-300 pointer-events-none z-10"
+                    role="tooltip"
+                  >
+                    {{ currentQuestion.explanation }}
+                  </div>
+                </div>
+              </div>
               <div class="space-y-4">
                 <button
                   v-for="(option, index) in currentQuestion.options"
@@ -730,9 +775,9 @@ function handleKeyboardShortcuts(event) {
             @click="nextQuestion"
             @keydown.enter="nextQuestion"
             @keydown.space.prevent="nextQuestion"
-            :disabled="!answers[currentQuestion.id]"
+            :disabled="!currentQuestion || !answers[currentQuestion.id]"
             :aria-label="
-              !answers[currentQuestion.id]
+              !currentQuestion || !answers[currentQuestion.id]
                 ? 'Please select an answer to continue'
                 : 'Go to next question'
             "
@@ -760,7 +805,7 @@ function handleKeyboardShortcuts(event) {
             @click="submitAssessment"
             @keydown.enter="submitAssessment"
             @keydown.space.prevent="submitAssessment"
-            :disabled="isSubmitting || !answers[currentQuestion.id]"
+            :disabled="isSubmitting || !currentQuestion || !answers[currentQuestion.id]"
             :aria-label="isSubmitting ? 'Submitting assessment...' : 'Submit assessment'"
             class="px-6 py-2 cursor-pointer font-semibold text-white bg-green-600 rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
           >
@@ -839,6 +884,7 @@ function handleKeyboardShortcuts(event) {
               placeholder="e.g., Q2 Security Audit"
               maxlength="30"
               class="block w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 mb-6"
+              ref="reportNameInput"
               required
             />
             <div class="flex justify-end space-x-4">

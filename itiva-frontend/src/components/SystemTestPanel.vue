@@ -130,7 +130,7 @@ const runAdditionalTests = async () => {
 
   // Test reports store methods
   try {
-    const reportsMethods = ['addReport', 'deleteReport', 'getReports']
+    const reportsMethods = ['addReport', 'deleteReport', 'getReportById']
     const reportsStoreValid = reportsMethods.every(
       (method) => typeof reportsStore[method] === 'function',
     )

@@ -273,8 +273,9 @@ export function runApplicationTests(appContext) {
       'addReport',
       'deleteReport',
       'getDraftById',
-      'addDraftReport',
-      'updateDraftReport',
+      'getReportById',
+      'saveOrUpdateDraft',
+      'loadReportsFromStorage',
     ])
     results.tests.push({
       name: 'Reports Store',

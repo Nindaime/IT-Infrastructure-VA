@@ -23,6 +23,26 @@ const route = useRoute()
 const assessmentStore = useAssessmentStore()
 const reportsStore = useReportsStore()
 
+// --- Admin View Logic ---
+const isAdminView = computed(() => route.query.viewAsAdmin === 'true')
+const viewedUserId = computed(() => (isAdminView.value ? route.query.userId : null))
+
+const viewedUser = computed(() => {
+  if (!viewedUserId.value) return null
+  // Find the user being viewed from the auth store's list of all users
+  return authStore.users.find((u) => u.id === viewedUserId.value)
+})
+
+const companyNameToDisplay = computed(() => {
+  if (isAdminView.value && viewedUser.value) {
+    return viewedUser.value.companyName || 'User Business'
+  }
+  // For regular user view, get the currently logged-in user's company name
+  return authStore.currentUser?.companyName || 'Your Business'
+})
+
+// --- End Admin View Logic ---
+
 // --- State and Data ---
 const reportData = ref(null)
 const summary = ref('')
@@ -37,8 +57,16 @@ const fullReportForPdf = ref(null) // Ref to the hidden, full-report element for
 
 // --- Default/Mock Data Structure (matching the reference) ---
 const defaultReport = {
-  name: 'PeeploTech',
-  scores: { ws: 65, dn: 80, cd: 40, csi: 75, overall: 65 },
+  name: 'Fallback Report',
+  scores: {
+    overall: 65,
+    categories: [
+      { name: 'Website Strength', score: 65 },
+      { name: 'Devices & Network', score: 80 },
+      { name: 'Compliance & Documentation', score: 40 },
+      { name: 'Cyber Security Implementations', score: 75 },
+    ],
+  },
   prioritizedRecs: [
     {
       rec: 'Implement a formal Incident Response Plan.',
@@ -83,9 +111,20 @@ const generateSummary = async (data) => {
 
   const overview = `This executive summary provides a high-level overview of the IT infrastructure vulnerability assessment conducted for <b>${name}</b>. The overall security score of <b>${scores.overall}</b> places the organization in a position with foundational security measures in place but highlights critical areas requiring immediate attention to mitigate significant risks.`
 
-  const breakdown = `The assessment reveals a notable strength in the <b>Devices & Network</b> category, scoring <b>${scores.dn}</b>. This indicates that core network security and device management protocols are relatively robust. However, this strength is contrasted by a considerable vulnerability in <b>Compliance Documentation</b>, which scored a low <b>${scores.cd}</b>. This represents a major compliance and operational risk.`
+  let breakdown = ''
+  if (scores.categories && scores.categories.length > 0) {
+    // Sort categories by score to find the highest and lowest.
+    const sortedCategories = [...scores.categories].sort((a, b) => a.score - b.score)
+    const lowestCat = sortedCategories[0]
+    const highestCat = sortedCategories[sortedCategories.length - 1]
 
-  const conclusion = `To bolster the overall security posture, it is imperative to prioritize the development and enforcement of comprehensive compliance documentation. Addressing the top recommendations, particularly ${topRecText}, will have the most significant positive impact on improving the organization's resilience against cyber threats.`
+    if (highestCat && lowestCat && highestCat.name !== lowestCat.name) {
+      breakdown = `The assessment reveals a notable strength in the <b>${highestCat.name}</b> category, scoring <b>${highestCat.score}</b>. This is contrasted by a considerable vulnerability in <b>${lowestCat.name}</b>, which scored a low <b>${lowestCat.score}</b>, representing a key area for improvement.`
+    } else if (highestCat) {
+      breakdown = `The assessment shows a consistent performance across all areas, with the <b>${highestCat.name}</b> category scoring <b>${highestCat.score}</b>.`
+    }
+  }
+  const conclusion = `To bolster the overall security posture, it is imperative to prioritize addressing the top recommendations. Particularly, ${topRecText}, will have the most significant positive impact on improving the organization's resilience against cyber threats.`
 
   summary.value = `${overview}<br><br>${breakdown}<br><br>${conclusion}`
   isLoadingSummary.value = false
@@ -99,7 +138,15 @@ const getScoreColor = (score) => {
 }
 
 const goBack = () => {
-  router.push('/dashboard')
+  // Navigate back to the correct dashboard (admin or user)
+  if (isAdminView.value && viewedUserId.value) {
+    router.push({
+      name: 'dashboard',
+      query: { viewAsAdmin: 'true', userId: viewedUserId.value },
+    })
+  } else {
+    router.push('/dashboard')
+  }
 }
 
 // --- Charting ---
@@ -116,14 +163,16 @@ function createOrUpdateChart(data, canvasId = 'reportRadarChart') {
   }
 
   const { scores } = data
-  // radarChartInstance = new Chart(ctx, {
+  const labels = scores.categories.map((c) => c.name)
+  const chartData = scores.categories.map((c) => c.score)
+
   const chart = new Chart(ctx, {
     type: 'radar',
     data: {
-      labels: ['Website', 'Network', 'Compliance', 'CyberSec'],
+      labels: labels,
       datasets: [
         {
-          data: [scores.ws, scores.dn, scores.cd, scores.csi],
+          data: chartData,
           backgroundColor: 'rgba(59, 130, 246, 0.2)',
           borderColor: 'rgba(59, 130, 246, 1)',
           borderWidth: 2,
@@ -153,85 +202,6 @@ function createOrUpdateChart(data, canvasId = 'reportRadarChart') {
     pdfRadarChartInstance = chart
   }
 }
-
-/**
- * Creates a configuration object for html2canvas to handle modern CSS color functions.
- */
-const getPdfCanvasOptions = () => ({
-  scale: 2, // Use scale 2 for a good balance of quality and file size.
-  useCORS: true,
-  backgroundColor: '#ffffff',
-  onclone: (clonedDoc) => {
-    const style = clonedDoc.createElement('style')
-    // This is a comprehensive style override to combat the "oklch" color parsing error.
-    // It covers all known color classes used in the app and sets safe defaults.
-    style.innerHTML = `
-      /* --- Universal Resets for PDF --- */
-      * {
-        -webkit-print-color-adjust: exact !important;
-        print-color-adjust: exact !important;
-        color-adjust: exact !important;
-        box-shadow: none !important;
-      }
-      body, html {
-        background-color: #ffffff !important;
-        color: #111827 !important; /* Default text to gray-900 */
-      }
-
-      /* --- Background Colors --- */
-      .bg-white { background-color: #ffffff !important; }
-      .bg-slate-800, .bg-gray-800 { background-color: #1f2937 !important; }
-      .bg-gray-600 { background-color: #4b5563 !important; }
-      .bg-gray-200 { background-color: #e5e7eb !important; }
-      .bg-gray-100 { background-color: #f3f4f6 !important; }
-      .bg-gray-50 { background-color: #f9fafb !important; }
-      .bg-blue-600 { background-color: #2563eb !important; }
-      .bg-blue-500 { background-color: #3b82f6 !important; }
-      .bg-blue-100 { background-color: #dbeafe !important; }
-      .bg-blue-50 { background-color: #eff6ff !important; }
-      .bg-green-600 { background-color: #16a34a !important; }
-      .bg-green-500 { background-color: #22c55e !important; }
-      .bg-green-50 { background-color: #f0fdf4 !important; }
-      .bg-yellow-500 { background-color: #eab308 !important; }
-      .bg-yellow-100 { background-color: #fef9c3 !important; }
-      .bg-yellow-50 { background-color: #fefce8 !important; }
-      .bg-red-600 { background-color: #dc2626 !important; }
-      .bg-red-500 { background-color: #ef4444 !important; }
-      .bg-red-50 { background-color: #fef2f2 !important; }
-      .bg-purple-50 { background-color: #f5f3ff !important; }
-
-      /* --- Text Colors --- */
-      .text-white { color: #ffffff !important; }
-      .text-gray-900 { color: #111827 !important; }
-      .text-gray-800 { color: #1f2937 !important; }
-      .text-gray-700 { color: #374151 !important; }
-      .text-gray-600 { color: #4b5563 !important; }
-      .text-gray-500 { color: #6b7280 !important; }
-      .text-gray-300 { color: #d1d5db !important; }
-      .text-blue-800 { color: #1e40af !important; }
-      .text-blue-700 { color: #1d4ed8 !important; }
-      .text-blue-600 { color: #2563eb !important; }
-      .text-green-800 { color: #166534 !important; }
-      .text-green-600 { color: #16a34a !important; }
-      .text-yellow-800 { color: #854d0e !important; }
-      .text-yellow-600 { color: #ca8a04 !important; }
-      .text-red-800 { color: #991b1b !important; }
-      .text-red-600 { color: #dc2626 !important; }
-      .text-red-500 { color: #ef4444 !important; }
-      .text-purple-800 { color: #6b21a8 !important; }
-      .text-emerald-600 { color: #059669 !important; }
-      .text-orange-600 { color: #ea580c !important; }
-
-      /* --- Border Colors --- */
-      .border, .border-b, .border-t, .border-l, .border-r { border-color: #e5e7eb !important; }
-      .border-gray-200 { border-color: #e5e7eb !important; }
-      .border-gray-300 { border-color: #d1d5db !important; }
-      .border-blue-600 { border-color: #2563eb !important; }
-      .border-blue-500 { border-color: #3b82f6 !important; }
-    `
-    clonedDoc.head.appendChild(style)
-  },
-})
 
 /**
  * Handles the PDF download process with manual pagination to prevent cut-off content.
@@ -406,6 +376,10 @@ async function downloadReportAsPDF() {
         ? `${recommendations[0].category}`
         : 'maintaining current security standards'
 
+    const sortedCategories = [...scores.categories].sort((a, b) => a.score - b.score)
+    const lowestCat = sortedCategories[0]
+    const highestCat = sortedCategories[sortedCategories.length - 1]
+
     const summarySegments = [
       {
         text: 'This executive summary provides a high-level overview of the IT infrastructure vulnerability assessment conducted for ',
@@ -420,17 +394,17 @@ async function downloadReportAsPDF() {
       },
       { text: '\n\n', bold: false },
       { text: 'The assessment reveals a notable strength in the ', bold: false },
-      { text: 'Devices & Network', bold: true },
+      { text: highestCat.name, bold: true },
       { text: ' category, scoring ', bold: false },
-      { text: String(scores.dn), bold: true },
+      { text: String(highestCat.score), bold: true },
       {
-        text: '. This indicates that core network security and device management protocols are relatively robust. However, this strength is contrasted by a considerable vulnerability in ',
+        text: '. This is contrasted by a considerable vulnerability in ',
         bold: false,
       },
-      { text: 'Compliance Documentation', bold: true },
+      { text: lowestCat.name, bold: true },
       { text: ', which scored a low ', bold: false },
-      { text: String(scores.cd), bold: true },
-      { text: '. This represents a major compliance and operational risk.', bold: false },
+      { text: String(lowestCat.score), bold: true },
+      { text: ', representing a key area for improvement.', bold: false },
       { text: '\n\n', bold: false },
       {
         text: 'To bolster the overall security posture, it is imperative to prioritize the development and enforcement of comprehensive compliance documentation. Addressing the top recommendations, particularly focusing on areas like ',
@@ -472,20 +446,15 @@ async function downloadReportAsPDF() {
     y += 30
 
     // const scores = reportData.value.scores
-    const scoreItems = [
-      { label: 'Website Strength', score: scores.ws },
-      { label: 'Devices & Network', score: scores.dn },
-      { label: 'Compliance Documentation', score: scores.cd },
-      { label: 'Cyber Security', score: scores.csi },
-    ]
+    const scoreItems = scores.categories
 
     pdf.setFontSize(11)
     scoreItems.forEach((item) => {
       pdf.setTextColor('#1f2937')
       pdf.setFont(undefined, 'bold')
-      pdf.text(item.label, margin, y)
+      pdf.text(item.name, margin, y)
       const scoreColorRgb = hexToRgb(getScoreColor(item.score))
-      pdf.setTextColor(scoreColorRgb[0], scoreColorRgb[1], scoreColorRgb[2])
+      pdf.setTextColor(scoreColorRgb[0], scoreColorRgb[1], scoreColorRgb[2]) // This line seems to have a bug, it should be item.score
       pdf.setFont(undefined, 'bold')
       pdf.text(String(item.score), margin + col1Width, y, { align: 'right' })
       pdf.setFont(undefined, 'normal')
@@ -581,37 +550,29 @@ async function downloadReportAsPDF() {
 
 // --- Lifecycle ---
 onMounted(() => {
-  // Fetch the report ID from the route parameters.
   const reportId = route.params.reportId
-  // Fetch the full report object directly from the reportsStore using its ID.
-  const fullReportObject = reportsStore.getReportById(reportId)
+  let fullReportObject = null
 
-  // // --- DEBUGGING LOG ---
-  // console.log('--- ReportViewerPage: Data Fetch ---')
-  // console.log('Report ID from URL:', reportId)
-  // console.log(
-  //   'Full Report Object from store (fullReportObject):',
-  //   JSON.parse(JSON.stringify(fullReportObject)),
-  // )
-  // if (fullReportObject) {
-  //   console.log('Report Content (fullReportObject.report):', fullReportObject.report)
-  //   console.log('Properties of report content:', Object.keys(fullReportObject.report || {}))
-  // }
-  // console.log('------------------------------------')
-  // // --- END DEBUGGING LOG ---
+  // In admin view, the report data is passed via router state to bypass security checks.
+  if (isAdminView.value && window.history.state.reportData) {
+    fullReportObject = window.history.state.reportData
+  } else {
+    // For regular users, fetch the report from the store, which includes a security check.
+    fullReportObject = reportsStore.getReportById(reportId)
+  }
 
-  // Check if a valid report was found.
+  // Check if a valid report was found either from state or store.
   if (fullReportObject && fullReportObject.report) {
     const reportContent = fullReportObject.report
     reportData.value = {
       name: fullReportObject.name,
       type: fullReportObject.type,
+      // The scores object now contains the overall score and the dynamic category array
       scores: {
-        ws: reportContent.ws,
-        dn: reportContent.dn,
-        cd: reportContent.cd,
-        csi: reportContent.cs, // Map cs to csi for the chart
         overall: reportContent.overall,
+        // Ensure categories is an array to prevent render errors.
+        // The key is `categoryScores` in the report object.
+        categories: reportContent.categoryScores || [],
       },
       // Use the generated recommendations directly
       // FIX: Ensure recommendations is always an array to prevent render errors.
@@ -645,7 +606,18 @@ onMounted(() => {
 
 <template>
   <div class="bg-gray-100 min-h-screen font-sans">
-    <AppHeader :is-logged-in="true" :show-new-assessment="false" />
+    <!-- Admin View Header: A special header shown only when an admin is viewing a report. -->
+    <header
+      v-if="isAdminView"
+      class="bg-white shadow-sm py-4 px-6 flex justify-between items-center sticky top-0 z-30"
+    >
+      <h2 class="text-xl font-bold text-gray-800">
+        Viewing Report for: <span class="text-indigo-600">{{ reportData?.name }}</span>
+      </h2>
+      <!-- The "Back" button inside the report content will handle navigation -->
+    </header>
+    <!-- Default User Header: The standard header for a logged-in user. -->
+    <AppHeader v-else :is-logged-in="true" :show-new-assessment="false" />
 
     <div class="container mx-auto p-4 md:p-8">
       <div id="report-content" class="max-w-4xl mx-auto bg-white shadow-2xl rounded-lg">
@@ -660,9 +632,7 @@ onMounted(() => {
                 <span class="font-bold text-white">{{ reportData.name }} Report</span> on
                 {{ generatedDate }} by ITIVA
               </p>
-              <p class="text-sm text-gray-300">
-                For: {{ authStore.currentUser?.companyName || 'Your Business' }}
-              </p>
+              <p class="text-sm text-gray-300">For: {{ companyNameToDisplay }}</p>
             </div>
             <div class="flex items-center space-x-4">
               <button
@@ -700,37 +670,15 @@ onMounted(() => {
               <div>
                 <h2 class="text-xl font-bold text-gray-800 mb-4">Score Breakdown</h2>
                 <div class="space-y-4">
-                  <div class="flex justify-between items-center">
-                    <span class="font-medium">Website Strength</span>
-                    <span
-                      class="font-bold text-lg"
-                      :style="{ color: getScoreColor(reportData.scores.ws) }"
-                      >{{ reportData.scores.ws }}</span
-                    >
-                  </div>
-                  <div class="flex justify-between items-center">
-                    <span class="font-medium">Devices & Network</span>
-                    <span
-                      class="font-bold text-lg"
-                      :style="{ color: getScoreColor(reportData.scores.dn) }"
-                      >{{ reportData.scores.dn }}</span
-                    >
-                  </div>
-                  <div class="flex justify-between items-center">
-                    <span class="font-medium">Compliance Documentation</span>
-                    <span
-                      class="font-bold text-lg"
-                      :style="{ color: getScoreColor(reportData.scores.cd) }"
-                      >{{ reportData.scores.cd }}</span
-                    >
-                  </div>
-                  <div class="flex justify-between items-center">
-                    <span class="font-medium">Cyber Security</span>
-                    <span
-                      class="font-bold text-lg"
-                      :style="{ color: getScoreColor(reportData.scores.csi) }"
-                      >{{ reportData.scores.csi }}</span
-                    >
+                  <div
+                    v-for="cat in reportData.scores.categories"
+                    :key="cat.name"
+                    class="flex justify-between items-center"
+                  >
+                    <span class="font-medium">{{ cat.name }}</span>
+                    <span class="font-bold text-lg" :style="{ color: getScoreColor(cat.score) }">{{
+                      cat.score
+                    }}</span>
                   </div>
                   <div class="border-t pt-4 mt-4 flex justify-between items-center">
                     <span class="font-bold text-lg">Overall Score</span>
@@ -813,7 +761,7 @@ onMounted(() => {
         </div>
       </div>
     </div>
-    <AppFooter />
+    <AppFooter v-if="!isAdminView" />
 
     <!-- Hidden full report for PDF generation -->
     <div class="pdf-only" ref="fullReportForPdf">
@@ -839,37 +787,15 @@ onMounted(() => {
               <div>
                 <h2 class="text-3xl font-bold text-gray-800 mb-6">Score Breakdown</h2>
                 <div class="space-y-4">
-                  <div class="flex justify-between items-center">
-                    <span class="font-medium text-2xl">Website Strength</span>
-                    <span
-                      class="font-bold text-3xl"
-                      :style="{ color: getScoreColor(reportData.scores.ws) }"
-                      >{{ reportData.scores.ws }}</span
-                    >
-                  </div>
-                  <div class="flex justify-between items-center">
-                    <span class="font-medium text-2xl">Devices & Network</span>
-                    <span
-                      class="font-bold text-3xl"
-                      :style="{ color: getScoreColor(reportData.scores.dn) }"
-                      >{{ reportData.scores.dn }}</span
-                    >
-                  </div>
-                  <div class="flex justify-between items-center">
-                    <span class="font-medium text-2xl">Compliance Documentation</span>
-                    <span
-                      class="font-bold text-3xl"
-                      :style="{ color: getScoreColor(reportData.scores.cd) }"
-                      >{{ reportData.scores.cd }}</span
-                    >
-                  </div>
-                  <div class="flex justify-between items-center">
-                    <span class="font-medium text-2xl">Cyber Security</span>
-                    <span
-                      class="font-bold text-3xl"
-                      :style="{ color: getScoreColor(reportData.scores.csi) }"
-                      >{{ reportData.scores.csi }}</span
-                    >
+                  <div
+                    v-for="cat in reportData.scores.categories"
+                    :key="cat.name"
+                    class="flex justify-between items-center"
+                  >
+                    <span class="font-medium text-2xl">{{ cat.name }}</span>
+                    <span class="font-bold text-3xl" :style="{ color: getScoreColor(cat.score) }">{{
+                      cat.score
+                    }}</span>
                   </div>
                   <div class="border-t pt-4 mt-4 flex justify-between items-center">
                     <span class="font-bold text-2xl">Overall Score</span

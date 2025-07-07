@@ -1,16 +1,41 @@
 <!-- src/views/DashboardPage.vue - Enhanced version with better UX and accessibility -->
 <script setup>
 import { ref, computed, onMounted, inject } from 'vue'
+import { useRoute, useRouter } from 'vue-router' // Add useRoute
 import { useAssessmentStore } from '@/stores/assessment' // Import the assessment store
 import { useAuthStore } from '@/stores/auth' // Import the auth store
 import { useReportsStore } from '@/stores/reports' // Import the new reports store
-import { useRouter } from 'vue-router'
 import AppHeader from '@/components/AppHeader.vue'
 import AppFooter from '@/components/AppFooter.vue'
 import SystemTestPanel from '@/components/SystemTestPanel.vue'
 
 // Initialize the Vue Router for navigation
 const router = useRouter()
+const route = useRoute()
+
+// --- Admin View Logic ---
+const isAdminView = computed(() => route.query.viewAsAdmin === 'true')
+const viewedUserId = computed(() => (isAdminView.value ? route.query.userId : null))
+
+const viewedUser = computed(() => {
+  if (!viewedUserId.value) return null
+  // Find the user being viewed from the auth store's list of all users
+  return authStore.users.find((u) => u.id === viewedUserId.value)
+})
+
+const viewedUserName = computed(() => {
+  if (!viewedUser.value) return 'User'
+  // Display company name if available, otherwise full name
+  return viewedUser.value.companyName || viewedUser.value.userFullName
+})
+
+/**
+ * Navigates the admin back to their main dashboard.
+ */
+function goBackToAdmin() {
+  router.push('/admin/dashboard')
+}
+// --- End Admin View Logic ---
 
 // Initialize the auth store
 const authStore = useAuthStore()
@@ -25,6 +50,9 @@ const showSettingsMenu = ref(false)
 const showDeleteConfirmModal = ref(false)
 const reportToDeleteId = ref(null)
 
+// Reactive state for search functionality
+const searchQuery = ref('')
+
 // Reactive state for the welcome modal
 const showWelcomeModal = ref(false)
 
@@ -35,14 +63,59 @@ const showSystemTestPanel = ref(false)
 const isLoading = ref(false)
 const isDeleting = ref(false)
 
-// Computed properties for better performance
-const completedReports = computed(() => reportsStore.completedReports)
+// --- Data Source Logic ---
+// This computed property dynamically determines which reports to show.
+const reportsForDisplay = computed(() => {
+  if (isAdminView.value && viewedUserId.value) {
+    // Admin view: filter all reports from the store for the specific user ID.
+    return reportsStore.allReports
+      .filter((r) => r.userId === viewedUserId.value)
+      .sort((a, b) => new Date(b.date) - new Date(a.date)) // Sort newest first
+  }
+  // Normal user view: use the default computed property from the store.
+  return reportsStore.userReports
+})
 
+const completedReports = computed(() => reportsForDisplay.value.filter((r) => !r.isDraft))
+const draftReports = computed(() => reportsForDisplay.value.filter((r) => r.isDraft))
+const hasDrafts = computed(() => draftReports.value.length > 0)
+
+// The average score must be recalculated for the admin view.
 const averageScore = computed(() => {
-  if (completedReports.value.length === 0) return 'N/A'
-  const avg =
-    completedReports.value.reduce((sum, r) => sum + r.score, 0) / completedReports.value.length
+  const reports = completedReports.value
+  if (reports.length === 0) return 'N/A'
+
+  // Group reports by type to find the latest of each.
+  const reportsByType = reports.reduce((acc, report) => {
+    const type = report.type
+    if (!acc[type]) {
+      acc[type] = []
+    }
+    acc[type].push(report)
+    return acc
+  }, {})
+
+  // Get the score from the latest report of each type.
+  const latestScores = Object.values(reportsByType).map((group) => {
+    const latestReport = group.sort((a, b) => new Date(b.date) - new Date(a.date))[0]
+    return latestReport.score
+  })
+
+  if (latestScores.length === 0) return 'N/A'
+
+  // Calculate and format the average.
+  const sumOfLatestScores = latestScores.reduce((sum, score) => sum + score, 0)
+  const avg = sumOfLatestScores / latestScores.length
   return avg.toFixed(1)
+})
+
+const filteredReports = computed(() => {
+  if (!searchQuery.value.trim()) {
+    return reportsForDisplay.value // Use the new dynamic data source
+  }
+  return reportsForDisplay.value.filter((report) =>
+    report.name.toLowerCase().includes(searchQuery.value.toLowerCase()),
+  )
 })
 
 // --- Grading Logic (copied for consistency) ---
@@ -84,11 +157,22 @@ function getScoreColorClass(score) {
 async function viewReport(report) {
   try {
     isLoading.value = true
-    // No longer pass data via the assessmentStore. Instead, navigate with the report's
-    // unique ID as a route parameter. This makes the ReportViewerPage self-sufficient.
-    await router.push({ name: 'ReportViewerPage', params: { reportId: report.id } })
+    const routeConfig = {
+      name: 'ReportViewerPage',
+      params: { reportId: report.id },
+    }
+
+    if (isAdminView.value) {
+      // For admin view, pass the full report object in the state to bypass
+      // the standard store security check, and pass query params to maintain context.
+      routeConfig.state = { reportData: JSON.parse(JSON.stringify(report)) }
+      routeConfig.query = { viewAsAdmin: 'true', userId: viewedUserId.value }
+    }
+
+    await router.push(routeConfig)
   } catch (error) {
     console.error('Error navigating to report:', error)
+    showToast('Failed to open report.', 'error')
   } finally {
     isLoading.value = false
   }
@@ -210,6 +294,9 @@ async function logout() {
 
 // Lifecycle hook to show welcome modal on first visit
 onMounted(() => {
+  // Only show the welcome modal for a regular user, not in admin view.
+  if (isAdminView.value) return
+
   // Check if this is the user's first visit to the dashboard
   const hasVisited = localStorage.getItem('dashboard-visited')
   if (!hasVisited) {
@@ -237,44 +324,68 @@ function closeSystemTestPanel() {
   <!-- Main container for the dashboard page, with light gray background -->
 
   <div class="min-h-screen bg-gray-100 font-sans flex flex-col">
-    <!-- The single, unified AppHeader is called here. -->
-    <AppHeader :show-new-assessment="true" />
+    <!-- Admin View Header: A special header shown only when an admin is viewing. -->
+    <header
+      v-if="isAdminView"
+      class="bg-white shadow-sm py-4 px-6 flex justify-between items-center sticky top-0 z-30"
+    >
+      <h2 class="text-xl font-bold text-gray-800">
+        Viewing Dashboard for: <span class="text-indigo-600">{{ viewedUserName }}</span>
+      </h2>
+      <button
+        @click="goBackToAdmin"
+        class="px-4 py-2 cursor-pointer bg-blue-600 text-white rounded-md font-semibold hover:bg-blue-700 transition-colors"
+      >
+        Back to Admin
+      </button>
+    </header>
+    <!-- Default User Header: The standard header for a logged-in user. -->
+    <AppHeader v-else :show-new-assessment="true" />
+
     <!-- Main Content Area: Centered, padded, responsive -->
     <main class="container mx-auto px-6 py-8 flex-grow">
       <!-- Welcome Heading - uses authStore.userFullName for better display -->
-      <h1 class="text-3xl font-bold text-gray-900 mb-6">Welcome, {{ authStore.userFullName }}!</h1>
+      <h1 v-if="!isAdminView" class="text-3xl font-bold text-gray-900 mb-6">
+        Welcome, {{ authStore.userFullName }}!
+      </h1>
 
       <!-- Dashboard Overview Cards: Grid layout for key metrics -->
       <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
         <!-- Total Assessments Card -->
         <div class="bg-white rounded-lg shadow p-6 text-center">
           <h3 class="text-xl font-semibold text-gray-700 mb-2">Total Assessments</h3>
-          <p class="text-5xl font-extrabold text-blue-600">
-            {{ reportsStore.completedReports.length }}
-          </p>
+          <p class="text-5xl font-extrabold text-blue-600">{{ completedReports.length }}</p>
         </div>
         <!-- Average Score Card -->
         <div class="bg-white rounded-lg shadow p-6 text-center">
           <h3 class="text-xl font-semibold text-gray-700 mb-2">Average Score</h3>
-          <p class="text-5xl font-extrabold text-green-600">
-            {{ averageScore }}
-          </p>
+          <p class="text-5xl font-extrabold text-green-600">{{ averageScore }}</p>
         </div>
         <!-- Draft Assessments Card -->
         <div class="bg-white rounded-lg shadow p-6 text-center">
           <h3 class="text-xl font-semibold text-gray-700 mb-2">Draft Assessments</h3>
-          <p class="text-5xl font-extrabold text-yellow-600">
-            {{ reportsStore.draftReports.length }}
-          </p>
+          <p class="text-5xl font-extrabold text-yellow-600">{{ draftReports.length }}</p>
         </div>
       </div>
 
       <!-- Recent Reports Section: Displays a table of user's past reports -->
       <section class="bg-white rounded-lg shadow p-6 mb-8">
-        <h2 class="text-2xl font-semibold text-gray-800 mb-4">Your Recent Reports</h2>
-        <div v-if="reportsStore.userReports.length > 0" class="overflow-x-auto">
-          <table class="min-w-full divide-y divide-gray-200 overflow-y-auto">
-            <thead class="bg-gray-50">
+        <div class="flex justify-between items-center mb-4">
+          <h2 class="text-2xl font-semibold text-gray-800">Your Recent Reports</h2>
+          <div class="w-full md:w-1/3">
+            <input
+              type="text"
+              v-model="searchQuery"
+              placeholder="Search reports by name..."
+              class="block w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
+              aria-label="Search reports by name"
+            />
+          </div>
+        </div>
+
+        <div v-if="filteredReports.length > 0" class="overflow-auto max-h-96">
+          <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50 sticky top-0">
               <tr>
                 <th
                   scope="col"
@@ -312,7 +423,7 @@ function closeSystemTestPanel() {
               </tr>
             </thead>
             <tbody class="bg-white divide-y divide-gray-200">
-              <tr v-for="report in reportsStore.userReports" :key="report.id">
+              <tr v-for="report in filteredReports" :key="report.id">
                 <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                   <div class="flex items-center">
                     <span>{{ report.name }}</span>
@@ -338,7 +449,7 @@ function closeSystemTestPanel() {
                     </span>
                     <!-- Continue assessment button for drafts -->
                     <button
-                      v-if="report.isDraft"
+                      v-if="report.isDraft && !isAdminView"
                       @click="continueAssessment(report)"
                       class="ml-2 text-gray-400 cursor-pointer hover:text-blue-600 transition-colors"
                       title="Continue Assessment"
@@ -361,7 +472,7 @@ function closeSystemTestPanel() {
                   </div>
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                  {{ report.date }}
+                  {{ report.date.replace('T', ' ').substring(0, 16) }}
                 </td>
                 <td
                   v-if="!report.isDraft"
@@ -392,8 +503,9 @@ function closeSystemTestPanel() {
                     >
                       View Report
                     </button>
-                    <!-- Delete button - available for both drafts and completed reports -->
+                    <!-- Delete button - only shown to the actual user, not in admin view -->
                     <button
+                      v-if="!isAdminView"
                       @click="promptDeleteReport(report.id)"
                       class="text-red-500 hover:text-red-700 cursor-pointer transition-colors"
                       :title="report.isDraft ? 'Delete Draft' : 'Delete Report'"
@@ -422,7 +534,10 @@ function closeSystemTestPanel() {
         <!-- Message if no reports are available -->
         <div v-else class="text-center py-8 text-gray-500">
           <p class="mb-4">
-            No reports found. Start a new assessment to see your vulnerability reports here!
+            <span v-if="searchQuery && reportsStore.userReports.length > 0"
+              >No reports match your search.</span
+            >
+            <span v-else>No reports found. Start a new assessment to see your reports here!</span>
           </p>
           <button
             @click="startNewAssessment"
@@ -434,7 +549,7 @@ function closeSystemTestPanel() {
       </section>
 
       <!-- Quick Actions Section: Buttons for common tasks -->
-      <section class="bg-white rounded-lg shadow p-6">
+      <section v-if="!isAdminView" class="bg-white rounded-lg shadow p-6">
         <h2 class="text-2xl font-semibold text-gray-800 mb-4">Quick Actions</h2>
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           <!-- Start New Assessment Button -->
@@ -461,8 +576,8 @@ function closeSystemTestPanel() {
           </button>
           <!-- Continue Draft Assessment Button - only show if there are drafts -->
           <button
-            v-if="reportsStore.hasDrafts"
-            @click="continueAssessment(reportsStore.draftReports[0])"
+            v-if="hasDrafts"
+            @click="continueAssessment(draftReports[0])"
             class="flex flex-col cursor-pointer items-center justify-center p-6 bg-yellow-50 rounded-lg shadow-sm hover:bg-yellow-100 transition-colors duration-200"
           >
             <!-- Icon for Continue Assessment -->
@@ -558,7 +673,7 @@ function closeSystemTestPanel() {
         </div>
       </section>
     </main>
-    <AppFooter />
+    <AppFooter v-if="!isAdminView" />
 
     <!-- Welcome Modal: Displays a welcome message when the dashboard is loaded -->
     <transition name="flash-out-fade">

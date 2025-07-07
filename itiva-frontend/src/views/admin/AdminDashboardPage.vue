@@ -1,28 +1,40 @@
 <!-- src/views/admin/AdminDashboardPage.vue - Updated as per requirements -->
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useAuthStore } from '@/stores/auth' // Import the auth store
 import { useRouter, RouterLink } from 'vue-router' // Import RouterLink for navigation
-import { mockRankings, fullQuestionnaireData } from '@/api/mockData' // Using mock data
+import { useReportsStore } from '@/stores/reports' // Import the reports store
+import { useQuestionnairesStore } from '@/stores/questionnaires' // Import the new questionnaires store
+import { mockRankings } from '@/api/mockData' // Using mock data
 
 // Initialize the router for navigation
 const router = useRouter()
 
 // Mock data for admin dashboard overview
 const totalUsers = ref(150)
-const activeAssessments = ref(25)
 
 // Initialize the auth store
 const authStore = useAuthStore()
+const reportsStore = useReportsStore()
+const questionnairesStore = useQuestionnairesStore() // Use the store
+const activeAssessments = ref(25)
 const pendingApprovals = ref(5)
 
-// Mock list of all businesses/clients (could be fetched from backend)
-const businesses = ref(
-  mockRankings.map((r) => ({
-    ...r,
-    id: r.rank, // Ensure unique ID for iteration
+// Get questionnaires from the store
+const questionnaires = computed(() =>
+  questionnairesStore.questionnaires.map((q) => ({
+    ...q,
+    questionsCount: questionnairesStore.getQuestionCountForAssessment(q.name),
+  })),
+)
+
+// This computed property combines mock businesses with real, qualified users
+const allBusinesses = computed(() => {
+  // Start with the mock data, ensuring unique IDs
+  const mockBusinesses = mockRankings.map((r) => ({
+    ...r, // Spread the original mock data
+    id: `mock-${r.rank}`,
     status: r.score > 70 ? 'Active' : 'Needs Attention',
-    // Add category scores directly from report for progress bars
     categoryScores: r.report
       ? [
           { name: 'Website Strength', score: r.report.ws, key: 'ws' },
@@ -31,36 +43,56 @@ const businesses = ref(
           { name: 'Cyber Security Implementations', score: r.report.cs, key: 'cs' },
         ]
       : [],
-  })),
-)
+    isRealUser: false,
+  }))
 
-// Reactive state for selected business to show category scores on the right side
-const selectedBusinessForScores = ref(businesses.value.length > 0 ? businesses.value[0] : null)
+  // 1. Get all available 'Active' assessment types
+  const availableAssessmentTypes = questionnairesStore.questionnaires
+    .filter((q) => q.status === 'Active')
+    .map((q) => q.name)
 
-// Mock list of questionnaires (editable by admin)
-const questionnaires = ref([
-  {
-    id: 1,
-    name: 'Standard ITIVA Assessment',
-    questionsCount: fullQuestionnaireData.length,
-    lastUpdated: '2024-05-01',
-    status: 'Active',
-  },
-  {
-    id: 2,
-    name: 'Advanced Cloud Security Check',
-    questionsCount: 15,
-    lastUpdated: '2024-04-10',
-    status: 'Active',
-  },
-  {
-    id: 3,
-    name: 'GDPR Compliance Audit',
-    questionsCount: 10,
-    lastUpdated: '2024-03-20',
-    status: 'Draft',
-  },
-])
+  // 2. Get all non-admin users
+  const users = authStore.users.filter((u) => !u.isAdmin)
+
+  // 3. Process each user to see if they qualify to be on the list
+  const userBusinesses = users
+    .map((user) => {
+      const result = reportsStore.calculateUserAverageScoreAndReports(
+        user.id,
+        availableAssessmentTypes,
+      )
+
+      if (!result) return null
+
+      const { averageScore, latestReports } = result
+
+      // As requested, find the latest "Standard ITIVA Assessment" to display its category scores.
+      // This provides a consistent and meaningful view for all users on the list.
+      const standardReport = latestReports.find((r) => r.type === 'Standard ITIVA Assessment')
+
+      // The categoryScores from the report already have `name` and `score`.
+      // We just need to add a `key` for the v-for loop to work correctly.
+      const avgCategoryScores =
+        // Directly use the categoryScores from the found report.
+        standardReport?.report?.categoryScores || []
+
+      return {
+        id: `user-${user.id}`,
+        name: user.companyName || user.userFullName,
+        location: user.city || 'N/A',
+        type: user.businessType || 'N/A',
+        score: averageScore,
+        status: averageScore > 70 ? 'Active' : 'Needs Attention',
+        categoryScores: avgCategoryScores,
+        isRealUser: true,
+      }
+    })
+    .filter(Boolean) // Remove nulls
+
+  const combined = [...mockBusinesses, ...userBusinesses]
+  combined.sort((a, b) => b.score - a.score)
+  return combined.map((biz, index) => ({ ...biz, rank: index + 1 }))
+})
 
 // Reactive state for search and sort for business list
 const searchTerm = ref('')
@@ -69,7 +101,7 @@ const sortOrder = ref(0) // 0 for descending, 1 for ascending
 
 // Computed property for filtered and sorted businesses in the list
 const filteredAndSortedBusinesses = computed(() => {
-  let filtered = businesses.value
+  let filtered = allBusinesses.value
 
   // Apply search filter
   if (searchTerm.value) {
@@ -106,6 +138,21 @@ function toggleSort(key) {
   }
 }
 
+// Reactive state for selected business to show category scores on the right side
+const selectedBusinessForScores = ref(null)
+
+// Watch for the combined list to populate and set the first item as selected
+watch(
+  allBusinesses,
+  (newBusinesses) => {
+    if (newBusinesses.length > 0 && !selectedBusinessForScores.value) {
+      selectedBusinessForScores.value = newBusinesses[0]
+    } else if (newBusinesses.length === 0) {
+      selectedBusinessForScores.value = null
+    }
+  },
+  { immediate: true },
+)
 /**
  * Sets the selected business for displaying category scores.
  * @param {object} biz The business object to select.
@@ -127,6 +174,20 @@ function editQuestionnaire(questionnaire) {
  */
 function addNewQuestionnaire() {
   router.push({ name: 'adminQuestionnaire', params: { questionnaireId: 'new' } })
+}
+
+/**
+ * Navigates to the selected user's dashboard in an admin-view mode.
+ * @param {object} business The business object, which must be a real user.
+ */
+function viewBusinessDashboard(business) {
+  if (!business.isRealUser) return
+  // Extract the user ID from the business object's ID (e.g., 'user-xyz' -> 'xyz')
+  const userId = business.id.replace('user-', '')
+  router.push({
+    name: 'dashboard',
+    query: { viewAsAdmin: 'true', userId: userId },
+  })
 }
 
 /**
@@ -178,7 +239,9 @@ function logout() {
         <!-- Total Users Card -->
         <div class="bg-white rounded-lg shadow p-6 text-center">
           <h3 class="text-xl font-semibold text-gray-700 mb-2">Total Users</h3>
-          <p class="text-5xl font-extrabold text-blue-600">{{ totalUsers }}</p>
+          <p class="text-5xl font-extrabold text-blue-600">
+            {{ authStore.users.filter((u) => !u.isAdmin).length }}
+          </p>
         </div>
         <!-- Active Assessments Card -->
         <div class="bg-white rounded-lg shadow p-6 text-center">
@@ -270,7 +333,19 @@ function logout() {
                 <div class="flex items-center">
                   <span class="font-bold text-gray-400 mr-4 w-6 text-center">{{ biz.rank }}</span>
                   <div>
-                    <p class="font-bold text-gray-900 text-lg">{{ biz.name }}</p>
+                    <p class="font-bold text-gray-900 text-lg flex items-center">
+                      {{ biz.name }}
+                      <span v-if="biz.isRealUser" title="Registered User" class="ml-2">
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          class="h-4 w-4 text-blue-500"
+                          viewBox="0 0 20 20"
+                          fill="currentColor"
+                        >
+                          <path d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" />
+                        </svg>
+                      </span>
+                    </p>
                     <p class="text-sm text-gray-600">{{ biz.location }} - {{ biz.type }}</p>
                   </div>
                 </div>
@@ -285,7 +360,7 @@ function logout() {
                           : 'text-red-600'
                     "
                   >
-                    {{ biz.score }}
+                    {{ typeof biz.score === 'number' ? biz.score.toFixed(1) : biz.score }}
                   </span>
                   <span
                     :class="[
@@ -310,42 +385,68 @@ function logout() {
 
           <!-- Right Side: Category Scores with Progress Bars (shows for selectedBusinessForScores) -->
           <div
-            class="w-full lg:w-1/2 bg-gray-50 p-4 rounded-lg border border-gray-200 flex flex-col justify-start"
+            class="w-full lg:w-1/2 bg-gray-50 p-4 rounded-lg border border-gray-200 flex flex-col justify-start relative"
+            v-if="selectedBusinessForScores"
           >
+            <button
+              v-if="selectedBusinessForScores.isRealUser"
+              @click="viewBusinessDashboard(selectedBusinessForScores)"
+              class="absolute cursor-pointer top-4 right-4 flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium shadow-sm"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                class="h-5 w-5 mr-2"
+                viewBox="0 0 20 20"
+                fill="currentColor"
+              >
+                <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
+                <path
+                  fill-rule="evenodd"
+                  d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z"
+                  clip-rule="evenodd"
+                />
+              </svg>
+              <span>View Business</span>
+            </button>
             <h3 class="text-8xl font-bold text-green-600 mb-2">
-              {{ selectedBusinessForScores.score }}
+              {{
+                typeof selectedBusinessForScores.score === 'number'
+                  ? selectedBusinessForScores.score.toFixed(1)
+                  : selectedBusinessForScores.score
+              }}
             </h3>
-            <div v-if="selectedBusinessForScores">
-              <p class="text-xl font-bold text-yellow-600 mb-4">
-                {{ selectedBusinessForScores.name }}'s Scores
-              </p>
-              <div class="space-y-2">
-                <div
-                  v-for="category in selectedBusinessForScores.categoryScores"
-                  :key="category.key"
-                >
-                  <p class="text-sm font-medium text-gray-700 mb-2">{{ category.name }}</p>
-                  <div class="w-full bg-gray-200 rounded-full h-4">
-                    <div
-                      class="h-full rounded-full flex items-center justify-end pr-2 text-xs font-bold text-white transition-all duration-500"
-                      :class="{
-                        'bg-green-500': category.score >= 85,
-                        'bg-emerald-500': category.score >= 75 && category.score < 85,
-                        'bg-yellow-500': category.score >= 65 && category.score < 75,
-                        'bg-orange-500': category.score >= 50 && category.score < 65,
-                        'bg-red-500': category.score < 50,
-                      }"
-                      :style="{ width: `${category.score}%` }"
-                    >
-                      {{ category.score }}%
-                    </div>
+            <p class="text-xl font-bold text-yellow-600 mb-4">
+              {{ selectedBusinessForScores.name }}'s Scores
+            </p>
+            <div class="space-y-2">
+              <div
+                v-for="(category, index) in selectedBusinessForScores.categoryScores"
+                :key="category.key || index"
+              >
+                <p class="text-sm font-medium text-gray-700 mb-2">{{ category.name }}</p>
+                <div class="w-full bg-gray-200 rounded-full h-4">
+                  <div
+                    class="h-full rounded-full flex items-center justify-end pr-2 text-xs font-bold text-white transition-all duration-500"
+                    :class="{
+                      'bg-green-500': category.score >= 85,
+                      'bg-emerald-500': category.score >= 75 && category.score < 85,
+                      'bg-yellow-500': category.score >= 65 && category.score < 75,
+                      'bg-orange-500': category.score >= 50 && category.score < 65,
+                      'bg-red-500': category.score < 50,
+                    }"
+                    :style="{ width: `${category.score}%` }"
+                  >
+                    {{ category.score }}%
                   </div>
                 </div>
               </div>
             </div>
-            <div v-else class="text-center py-8 text-gray-500">
-              Select a business from the list to view its category scores.
-            </div>
+          </div>
+          <div
+            v-else
+            class="w-full lg:w-1/2 bg-gray-50 p-4 rounded-lg border border-gray-200 flex items-center justify-center text-gray-500"
+          >
+            Select a business from the list to view its category scores.
           </div>
         </div>
       </section>
@@ -356,7 +457,7 @@ function logout() {
         <div class="mb-4">
           <button
             @click="addNewQuestionnaire"
-            class="px-5 py-2 bg-blue-600 text-white rounded-md font-semibold hover:bg-blue-700 transition-colors duration-200"
+            class="px-5 py-2 bg-blue-600 cursor-pointer text-white rounded-md font-semibold hover:bg-blue-700 transition-colors duration-200"
           >
             Create New Questionnaire
           </button>
@@ -420,7 +521,7 @@ function logout() {
                 <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                   <button
                     @click="editQuestionnaire(q)"
-                    class="text-indigo-600 hover:text-indigo-900 transition-colors duration-200"
+                    class="text-indigo-600 cursor-pointer hover:text-indigo-900 transition-colors duration-200"
                   >
                     Edit
                   </button>
