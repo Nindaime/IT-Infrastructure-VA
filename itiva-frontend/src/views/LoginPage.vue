@@ -1,6 +1,6 @@
 <!-- src/views/LoginPage.vue - Updated with comprehensive registration fields, improved responsiveness, and ITIVA header link -->
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, watch, nextTick } from 'vue'
 import { useAuthStore } from '@/stores/auth' // Import the auth store
 import { useRouter, RouterLink } from 'vue-router' // Import RouterLink for navigation
 
@@ -20,6 +20,10 @@ const firstName = ref('') // For registration
 const lastName = ref('') // For registration
 const registrationUserName = ref('') // For registration
 const email = ref('') // For registration
+
+// Template refs for autofocus
+const loginUsernameInput = ref(null)
+const registerCompanyNameInput = ref(null)
 
 // Password visibility states
 const showPassword = ref(false)
@@ -243,6 +247,22 @@ function switchTab(tab) {
   showConfirmPassword.value = false
   showLoginPassword.value = false
 }
+
+onMounted(() => {
+  // Autofocus the login username field when the component mounts
+  loginUsernameInput.value?.focus()
+})
+
+watch(activeTab, (newTab) => {
+  // When the tab switches, wait for the DOM to update, then focus the correct input.
+  nextTick(() => {
+    if (newTab === 'login') {
+      loginUsernameInput.value?.focus()
+    } else if (newTab === 'register') {
+      registerCompanyNameInput.value?.focus()
+    }
+  })
+})
 </script>
 
 <template>
@@ -317,6 +337,7 @@ function switchTab(tab) {
                     autocomplete="username"
                     required="true"
                     v-model="username"
+                    ref="loginUsernameInput"
                     class="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                   />
                 </div>
@@ -337,6 +358,7 @@ function switchTab(tab) {
                     class="appearance-none block w-full px-3 py-2 pr-10 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                   />
                   <button
+                    v-if="password"
                     type="button"
                     @click="showLoginPassword = !showLoginPassword"
                     class="absolute inset-y-0 right-0 pr-3 flex items-center cursor-pointer"
@@ -485,6 +507,7 @@ function switchTab(tab) {
                 type="text"
                 v-model="companyName"
                 required
+                ref="registerCompanyNameInput"
                 placeholder="e.g., Acme Corp"
                 class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
               />
@@ -644,7 +667,7 @@ function switchTab(tab) {
                   placeholder="e.g., SecureP@ssw0rd"
                   class="block w-full px-3 py-2 pr-20 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                 />
-                <div class="absolute inset-y-0 right-0 flex items-center pr-2">
+                <div v-if="password" class="absolute inset-y-0 right-0 flex items-center pr-2">
                   <button
                     type="button"
                     @click="suggestStrongPassword"

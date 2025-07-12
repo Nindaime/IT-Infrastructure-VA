@@ -56,6 +56,7 @@ itiva-frontend/
 │   ├── stores/
 │   │   ├── auth.js              # User authentication store
 │   │   ├── assessment.js        # Assessment management store
+│   │   ├── questionnaires.js    # Questionnaire data store
 │   │   └── reports.js           # Reports management store
 │   ├── utils/
 │   │   ├── errorHandler.js      # Error handling utilities

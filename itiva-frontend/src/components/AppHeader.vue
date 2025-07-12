@@ -1,7 +1,7 @@
 <!-- src/components/AppHeader.vue -->
 <script setup>
-import { ref } from 'vue'
-import { useAssessmentStore } from '@/stores/assessment' // Import the assessment store
+import { ref, computed } from 'vue'
+import { useQuestionnairesStore } from '@/stores/questionnaires'
 import { useAuthStore } from '@/stores/auth' // Import the auth store
 import { RouterLink, useRouter, useRoute } from 'vue-router'
 
@@ -25,7 +25,7 @@ const props = defineProps({
 })
 
 // Define emits for custom events, such as logging out
-const emit = defineEmits(['logout', 'change-assessment'])
+const emit = defineEmits(['logout', 'change-assessment', 'request-new-assessment-modal'])
 
 const router = useRouter()
 const route = useRoute()
@@ -33,14 +33,20 @@ const route = useRoute()
 // Initialize the auth store
 const authStore = useAuthStore()
 
+const questionnairesStore = useQuestionnairesStore()
+
 // Reactive state to toggle the user settings dropdown menu
 const showSettingsMenu = ref(false)
 const showAssessmentMenu = ref(false)
 const isMobileMenuOpen = ref(false)
 
-const assessmentStore = useAssessmentStore()
-const assessmentTypes = assessmentStore.availableAssessments
-
+const activeAssessments = computed(() =>
+  questionnairesStore.questionnaires
+    .filter((q) => q.status === 'Active')
+    .map((q) => ({
+      name: q.name,
+    })),
+)
 /**
  * Toggles the visibility of the user settings dropdown menu.
  */
@@ -62,18 +68,14 @@ function toggleMobileMenu() {
   isMobileMenuOpen.value = !isMobileMenuOpen.value
 }
 
-/**
- * Navigates to the questionnaire page to start a new assessment.
- * @param {string} type The type of assessment to start.
- */
-function startNewAssessment(type) {
-  showAssessmentMenu.value = false
-  router.push({ name: 'questionnaire', params: { type } })
-}
-
 function changeAssessment(type) {
   showAssessmentMenu.value = false
   emit('change-assessment', type)
+}
+
+function openNewAssessmentModalFromMobile() {
+  isMobileMenuOpen.value = false // Close the hamburger menu
+  emit('request-new-assessment-modal')
 }
 
 /**
@@ -95,9 +97,9 @@ function handleLogout() {
         <template v-if="!authStore.isAuthenticated">
           <RouterLink
             to="/"
-            class="text-2xl font-bold text-blue-600 hover:text-blue-700 transition-colors"
+            class="text-2xl font-bold text-black-600 hover:text-blue-700 transition-colors"
           >
-            ITIVA
+            IT<span class="text-blue-600">I</span>VA
           </RouterLink>
           <div class="hidden md:flex items-center space-x-6">
             <RouterLink
@@ -163,13 +165,13 @@ function handleLogout() {
                   @click.away="showAssessmentMenu = false"
                 >
                   <RouterLink
-                    v-for="type in assessmentTypes"
-                    :key="type"
-                    :to="{ name: 'questionnaire', params: { type } }"
+                    v-for="assessment in activeAssessments"
+                    :key="assessment.name"
+                    :to="{ name: 'questionnaire', params: { type: assessment.name } }"
                     @click="showAssessmentMenu = false"
                     class="block w-full cursor-pointer text-left px-4 py-2 text-sm text-gray-700 hover:bg-blue-50"
                   >
-                    {{ type }}
+                    {{ assessment.name }}
                   </RouterLink>
                 </div>
               </transition>
@@ -197,15 +199,16 @@ function handleLogout() {
                   @click.away="showAssessmentMenu = false"
                 >
                   <button
-                    v-for="type in assessmentTypes"
-                    :key="type"
-                    @click="changeAssessment(type)"
-                    :disabled="type === assessmentType"
+                    v-for="assessment in activeAssessments"
+                    :key="assessment.name"
+                    @click="changeAssessment(assessment.name)"
+                    :disabled="assessment.name === assessmentType"
                     class="block w-full text-left px-4 py-2 text-sm transition-colors"
                     :class="{
                       'bg-blue-100 text-blue-700 font-bold cursor-not-allowed':
-                        type === assessmentType,
-                      'text-gray-700 hover:bg-blue-50 cursor-pointer': type !== assessmentType,
+                        assessment.name === assessmentType,
+                      'text-gray-700 hover:bg-blue-50 cursor-pointer':
+                        assessment.name !== assessmentType,
                     }"
                   >
                     {{ type }}
@@ -299,6 +302,14 @@ function handleLogout() {
             class="block w-full text-center mt-2 px-3 py-2 rounded-md text-base font-medium text-white bg-blue-600 hover:bg-blue-700"
             >Get Started</RouterLink
           >
+          <!-- New Assessment button for logged-in mobile users -->
+          <button
+            v-if="authStore.isAuthenticated"
+            @click="openNewAssessmentModalFromMobile"
+            class="block w-full text-left px-3 py-2 rounded-md text-base font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-50"
+          >
+            New Assessment
+          </button>
         </div>
       </div>
     </transition>

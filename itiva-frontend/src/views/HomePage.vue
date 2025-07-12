@@ -1,6 +1,6 @@
 <!-- src/views/HomePage.vue - Major rebuild based on new layout and grading requirements -->
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useAuthStore } from '@/stores/auth' // Import the auth store
 import { useAssessmentStore } from '@/stores/assessment' // Import the assessment store
 import { useRouter } from 'vue-router'
@@ -9,6 +9,27 @@ import { mockRankings } from '@/api/mockData' // Assuming mockRankings is struct
 // Initialize the router for programmatic navigation
 const router = useRouter()
 
+const showScrollTopButton = ref(false)
+
+const handleScroll = () => {
+  // Show button after scrolling down 400px
+  showScrollTopButton.value = window.scrollY > 400
+}
+
+const scrollToTop = () => {
+  window.scrollTo({
+    top: 0,
+    behavior: 'smooth',
+  })
+}
+
+onMounted(() => {
+  window.addEventListener('scroll', handleScroll)
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('scroll', handleScroll)
+})
 // Reactive reference for the list of mock rankings
 // Limiting to 10 companies as requested
 const rankings = ref(mockRankings.slice(0, 10))
@@ -91,9 +112,9 @@ const rankingsByType = computed(() => {
   )
 })
 
-// Initialize the auth store
-const authStore = useAuthStore()
-const assessmentStore = useAssessmentStore()
+// // Initialize the auth store
+// const authStore = useAuthStore()
+// const assessmentStore = useAssessmentStore()
 
 /**
  * Navigates the user to the login page to start an assessment.
@@ -531,4 +552,33 @@ function navigateToLogin() {
       </div>
     </section>
   </div>
+  <!-- Scroll-to-top Button -->
+  <transition name="fade">
+    <button
+      v-if="showScrollTopButton"
+      @click="scrollToTop"
+      class="fixed bottom-8 cursor-pointer right-8 bg-blue-600 text-white p-3 rounded-full shadow-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all z-50"
+      aria-label="Scroll to top"
+    >
+      <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          stroke-width="2"
+          d="M5 15l7-7 7 7"
+        ></path>
+      </svg>
+    </button>
+  </transition>
 </template>
+
+<style scoped>
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.3s ease;
+}
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
+</style>

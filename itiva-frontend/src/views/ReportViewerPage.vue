@@ -634,21 +634,21 @@ onMounted(() => {
               </p>
               <p class="text-sm text-gray-300">For: {{ companyNameToDisplay }}</p>
             </div>
-            <div class="flex items-center space-x-4">
+            <div class="flex items-center space-x-2 sm:space-x-4">
               <button
                 @click="goBack"
-                class="flex cursor-pointer items-center space-x-2 px-4 py-2 bg-gray-600 rounded-lg hover:bg-gray-700 transition pdf-hide"
+                class="flex cursor-pointer items-center px-3 py-2 sm:px-4 bg-gray-600 rounded-lg hover:bg-gray-700 transition pdf-hide"
               >
                 <BackIcon />
-                <span>Back</span>
+                <span class="hidden sm:inline ml-2">Back</span>
               </button>
               <button
                 @click="downloadReportAsPDF"
                 :disabled="isDownloading"
-                class="flex cursor-pointer items-center space-x-2 px-4 py-2 bg-blue-600 rounded-lg hover:bg-blue-700 transition disabled:bg-gray-400 pdf-hide"
+                class="flex cursor-pointer items-center px-3 py-2 sm:px-4 bg-blue-600 rounded-lg hover:bg-blue-700 transition disabled:bg-gray-400 pdf-hide"
               >
                 <DownloadIcon />
-                <span>{{ isDownloading ? '...' : 'Download' }}</span>
+                <span class="hidden sm:inline ml-2">{{ isDownloading ? '...' : 'Download' }}</span>
               </button>
             </div>
           </header>
@@ -761,7 +761,7 @@ onMounted(() => {
         </div>
       </div>
     </div>
-    <AppFooter v-if="!isAdminView" />
+    <AppFooter />
 
     <!-- Hidden full report for PDF generation -->
     <div class="pdf-only" ref="fullReportForPdf">

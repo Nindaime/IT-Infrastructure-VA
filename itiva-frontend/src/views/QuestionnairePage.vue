@@ -79,6 +79,9 @@ const categoryStyles = {
   // New categories for GDPR
   'Data Governance': { color: 'bg-teal-500' },
   'Operational Compliance': { color: 'bg-cyan-600' },
+  // New categories for GDPR
+  'IT Configuration': { color: 'bg-blue-500' },
+  'User Preferences': { color: 'bg-green-600' },
 }
 const defaultCategoryStyle = { color: 'bg-gray-500' }
 
@@ -364,13 +367,11 @@ function generateReportFromAnswers() {
 
 function resetStateAndStartNewDraft(type) {
   // Filter questions based on the selected assessment type
+  // questions.value = questionnairesStore.allQuestions.filter((q) => q.assessment_name === type)
   questions.value = questionnairesStore.allQuestions
     .filter((q) => q.assessment_name === type)
     .sort((a, b) => {
-      // First, sort by category alphabetically
-      const categoryComparison = a.category.localeCompare(b.category)
-      if (categoryComparison !== 0) return categoryComparison
-      // If categories are the same, sort by ID numerically
+      // sort by ID numerically
       return a.id - b.id
     })
   answers.value = questions.value.reduce((acc, q) => ({ ...acc, [q.id]: null }), {})
