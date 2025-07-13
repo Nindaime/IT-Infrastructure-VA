@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@ilovepdf/ilovepdf-nodejs": "^0.3.1",
+    "@vercel/speed-insights": "^1.2.0",
     "axios": "^1.10.0",
     "chart.js": "^4.5.0",
     "exceljs": "^4.4.0",

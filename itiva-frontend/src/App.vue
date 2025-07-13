@@ -4,6 +4,7 @@ import { computed, ref, provide, onMounted } from 'vue'
 import { useRoute, RouterView } from 'vue-router'
 import { useAuthStore } from './stores/auth'
 import { useReportsStore } from './stores/reports'
+import { SpeedInsights } from '@vercel/speed-insights/vue'
 import AppHeader from './components/AppHeader.vue' // Global header component
 import AppFooter from './components/AppFooter.vue' // Global footer component
 import ToastNotification from '@/components/ToastNotification.vue'
@@ -99,6 +100,7 @@ const showGlobalHeaderAndFooter = computed(() => {
       :duration="toast.duration"
       @close="hideToast"
     />
+    <SpeedInsights />
   </div>
 </template>
 
