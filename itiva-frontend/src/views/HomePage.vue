@@ -1,8 +1,9 @@
 <!-- src/views/HomePage.vue - Major rebuild based on new layout and grading requirements -->
 <script setup>
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
-import { useAuthStore } from '@/stores/auth' // Import the auth store
-import { useAssessmentStore } from '@/stores/assessment' // Import the assessment store
+import { useAuthStore } from '@/stores/auth'
+import { useReportsStore } from '@/stores/reports'
+import { useQuestionnairesStore } from '@/stores/questionnaires'
 import { useRouter } from 'vue-router'
 import { mockRankings } from '@/api/mockData' // Assuming mockRankings is structured as per previous definition
 
@@ -30,9 +31,69 @@ onMounted(() => {
 onBeforeUnmount(() => {
   window.removeEventListener('scroll', handleScroll)
 })
-// Reactive reference for the list of mock rankings
-// Limiting to 10 companies as requested
-const rankings = ref(mockRankings.slice(0, 10))
+
+const authStore = useAuthStore()
+const reportsStore = useReportsStore()
+const questionnairesStore = useQuestionnairesStore()
+
+const rankings = computed(() => {
+  // 1. Adjust mock businesses to ensure they have a B grade or higher
+  const adjustedMockBusinesses = mockRankings.map((biz) => {
+    let score = biz.score
+    // If score is C grade (65-74) or D/E grade (<65), bump it to a B or A grade.
+    if (score < 75) {
+      // Randomly assign a B or A grade score (75-95)
+      score = 75 + Math.random() * 20
+    }
+    return {
+      ...biz,
+      score: score,
+      id: `mock-${biz.rank}`,
+      isRealUser: false,
+    }
+  })
+
+  // 2. Get real users who qualify
+  const activeQuestionnaireNames = questionnairesStore.questionnaires
+    .filter((q) => q.status === 'Active')
+    .map((q) => q.name)
+
+  const totalActiveQuestionnaires = activeQuestionnaireNames.length
+  const users = authStore.users.filter((u) => !u.isAdmin)
+
+  const qualifiedUserBusinesses = users
+    .map((user) => {
+      const result = reportsStore.calculateUserAverageScoreAndReports(
+        user.id,
+        activeQuestionnaireNames,
+      )
+      if (!result) return null
+
+      const { averageScore, latestReports } = result
+
+      // Conditions: Must have completed ALL active questionnaires and have a score of 75+
+      if (latestReports.length < totalActiveQuestionnaires || averageScore < 75) {
+        return null
+      }
+
+      return {
+        id: `user-${user.id}`,
+        name: user.companyName || user.userFullName,
+        location: user.city || 'N/A',
+        type: user.businessType || 'N/A',
+        score: averageScore,
+        isRealUser: true,
+      }
+    })
+    .filter(Boolean) // Remove nulls
+
+  // 3. Combine, sort, and rank
+  const combined = [...adjustedMockBusinesses, ...qualifiedUserBusinesses]
+  combined.sort((a, b) => b.score - a.score)
+  // Take only the top 10 businesses for the rankings
+  const top10 = combined.slice(0, 10)
+  return top10.map((biz, index) => ({ ...biz, rank: index + 1 }))
+})
 
 // --- Grading Logic ---
 /**
@@ -123,7 +184,6 @@ function navigateToLogin() {
   router.push('/login')
 }
 </script>
-
 <template>
   <div class="font-sans">
     <!-- Hero Section: Grand, eye-catching introduction with gradient background and shadow -->
@@ -137,7 +197,7 @@ function navigateToLogin() {
         <!-- Sub-heading/Description: Readable text, centered, with slight opacity -->
         <p class="text-lg md:text-xl max-w-3xl mx-auto mb-10 opacity-90">
           ITIVA (IT Infrastructure Vulnerability Assessment) is an intelligent platform that helps
-          businesses in the UK identify, analyze, and mitigate security risks across their digital
+          businesses globally identify, analyze, and mitigate security risks across their digital
           infrastructure.
         </p>
         <!-- Call to Action Button: Prominent, white background, blue text, interactive hover effects -->
@@ -153,10 +213,12 @@ function navigateToLogin() {
     <section id="rankings" class="py-20 bg-gray-50/70">
       <div class="container mx-auto px-6">
         <div class="text-center mb-12">
-          <h2 class="text-3xl md:text-4xl font-bold text-gray-800">UK's Most Secure Businesses</h2>
+          <h2 class="text-3xl md:text-4xl font-bold text-gray-800">
+            Top Secure Businesses Globally
+          </h2>
           <p class="text-gray-600 mt-4 max-w-2xl mx-auto mb-8">
-            Discover the top-ranked businesses based on their comprehensive ITIVA vulnerability
-            score, grouped by various criteria.
+            Discover top-ranked businesses based on their comprehensive ITIVA vulnerability score,
+            grouped by various criteria.
           </p>
           <!-- Removed "Group by:" and filter buttons as per new requirements -->
         </div>
