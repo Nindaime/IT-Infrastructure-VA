@@ -162,139 +162,143 @@ function updateOptionField(question, optionIndex, field, value) {
       </div>
     </div>
 
-    <div v-if="paginatedQuestions.length > 0" class="relative">
-      <!-- Re-implementing draggable based on official documentation -->
-      <draggable
-        v-model="paginatedQuestions"
-        item-key="uuid"
-        tag="div"
-        class="space-y-4"
-        handle=".drag-handle"
-        name="question-list"
-      >
-        <div
-          v-for="q in paginatedQuestions"
-          :key="q.uuid"
-          class="bg-gray-50 p-4 rounded-lg border border-gray-200 flex items-start gap-3"
-        >
-          <!-- Drag Handle -->
-          <div class="drag-handle pt-1">
-            <svg
-              class="w-6 h-6 text-gray-400"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
+    <transition name="page-fade" mode="out-in">
+      <div :key="currentPage">
+        <div v-if="paginatedQuestions.length > 0" class="relative">
+          <!-- Re-implementing draggable based on official documentation -->
+          <draggable
+            v-model="paginatedQuestions"
+            item-key="uuid"
+            tag="div"
+            class="space-y-4"
+            handle=".drag-handle"
+            name="question-list"
+          >
+            <div
+              v-for="q in paginatedQuestions"
+              :key="q.uuid"
+              class="bg-gray-50 p-4 rounded-lg border border-gray-200 flex items-start gap-3"
             >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M4 6h16M4 12h16m-7 6h7"
-              ></path>
-            </svg>
-          </div>
-
-          <div class="w-full">
-            <div class="flex justify-between items-start mb-2 gap-4">
-              <div class="flex-grow flex items-center gap-4">
-                <div>
-                  <label :for="`q-id-${q.id}`" class="block text-xs font-medium text-gray-500"
-                    >No.</label
-                  >
-                  <input
-                    type="text"
-                    :id="`q-id-${q.id}`"
-                    :value="q.id"
-                    readonly
-                    class="w-12 text-center bg-gray-100 border border-gray-300 rounded-md p-1"
-                  />
-                </div>
-                <div class="flex-grow">
-                  <label :for="`q-cat-${q.id}`" class="block text-xs font-medium text-gray-500"
-                    >Category</label
-                  >
-                  <input
-                    :id="`q-cat-${q.id}`"
-                    :value="q.category"
-                    class="w-full text-sm font-medium text-blue-600 bg-transparent border-b border-blue-200 focus:outline-none focus:border-blue-500"
-                    @input="updateQuestionField(q, 'category', $event.target.value)"
-                    :list="`category-list-${q.id}`"
-                  />
-                  <datalist :id="`category-list-${q.id}`">
-                    <option v-for="cat in props.categories" :key="cat" :value="cat"></option>
-                  </datalist>
-                </div>
-              </div>
-              <button
-                @click="removeQuestion(q.id)"
-                class="p-2 rounded-full cursor-pointer text-red-600 hover:bg-red-100 transition-colors flex-shrink-0"
-              >
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <!-- Drag Handle -->
+              <div class="drag-handle pt-1">
+                <svg
+                  class="w-6 h-6 text-gray-400"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
                   <path
                     stroke-linecap="round"
                     stroke-linejoin="round"
                     stroke-width="2"
-                    d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                    d="M4 6h16M4 12h16m-7 6h7"
                   ></path>
                 </svg>
-              </button>
-            </div>
-            <textarea
-              :value="q.text"
-              rows="2"
-              class="w-full text-lg font-medium text-gray-800 bg-gray-100 p-2 rounded-md border border-gray-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
-              @input="updateQuestionField(q, 'text', $event.target.value)"
-            ></textarea>
-            <textarea
-              :value="q.explanation"
-              rows="2"
-              class="w-full text-sm text-gray-600 mt-2 bg-gray-100 p-2 rounded-md border border-gray-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
-              placeholder="Question Explanation"
-              @input="updateQuestionField(q, 'explanation', $event.target.value)"
-            ></textarea>
-            <div class="mt-4 space-y-2">
-              <div
-                v-for="(option, idx) in q.options"
-                :key="idx"
-                class="p-2 border-l-4 border-gray-200"
-              >
-                <input
-                  type="text"
-                  :value="option.text"
-                  @input="updateOptionField(q, idx, 'text', $event.target.value)"
-                  class="w-full text-sm text-gray-700 bg-white p-1 rounded border border-gray-200"
-                  placeholder="Option Text"
-                />
+              </div>
+
+              <div class="w-full">
+                <div class="flex justify-between items-start mb-2 gap-4">
+                  <div class="flex-grow flex items-center gap-4">
+                    <div>
+                      <label :for="`q-id-${q.id}`" class="block text-xs font-medium text-gray-500"
+                        >No.</label
+                      >
+                      <input
+                        type="text"
+                        :id="`q-id-${q.id}`"
+                        :value="q.id"
+                        readonly
+                        class="w-12 text-center bg-gray-100 border border-gray-300 rounded-md p-1"
+                      />
+                    </div>
+                    <div class="flex-grow">
+                      <label :for="`q-cat-${q.id}`" class="block text-xs font-medium text-gray-500"
+                        >Category</label
+                      >
+                      <input
+                        :id="`q-cat-${q.id}`"
+                        :value="q.category"
+                        class="w-full text-sm font-medium text-blue-600 bg-transparent border-b border-blue-200 focus:outline-none focus:border-blue-500"
+                        @input="updateQuestionField(q, 'category', $event.target.value)"
+                        :list="`category-list-${q.id}`"
+                      />
+                      <datalist :id="`category-list-${q.id}`">
+                        <option v-for="cat in props.categories" :key="cat" :value="cat"></option>
+                      </datalist>
+                    </div>
+                  </div>
+                  <button
+                    @click="removeQuestion(q.id)"
+                    class="p-2 rounded-full cursor-pointer text-red-600 hover:bg-red-100 transition-colors flex-shrink-0"
+                  >
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                        d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                      ></path>
+                    </svg>
+                  </button>
+                </div>
                 <textarea
-                  :value="option.explanation"
-                  @input="updateOptionField(q, idx, 'explanation', $event.target.value)"
-                  rows="1"
-                  class="w-full text-xs text-gray-500 mt-1 bg-white p-1 rounded border border-gray-200"
-                  placeholder="Option Explanation"
+                  :value="q.text"
+                  rows="2"
+                  class="w-full text-lg font-medium text-gray-800 bg-gray-100 p-2 rounded-md border border-gray-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  @input="updateQuestionField(q, 'text', $event.target.value)"
                 ></textarea>
                 <textarea
-                  :value="option.recommendation"
-                  @input="updateOptionField(q, idx, 'recommendation', $event.target.value)"
-                  rows="1"
-                  class="w-full text-xs text-gray-500 mt-1 bg-white p-1 rounded border border-gray-200"
-                  placeholder="Option Recommendation"
+                  :value="q.explanation"
+                  rows="2"
+                  class="w-full text-sm text-gray-600 mt-2 bg-gray-100 p-2 rounded-md border border-gray-200 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  placeholder="Question Explanation"
+                  @input="updateQuestionField(q, 'explanation', $event.target.value)"
                 ></textarea>
-                <div class="flex items-center mt-1">
-                  <label class="text-xs mr-2">Score:</label>
-                  <input
-                    type="number"
-                    :value="option.score"
-                    @input="updateOptionField(q, idx, 'score', parseFloat($event.target.value))"
-                    class="w-16 text-sm text-gray-700 bg-white p-1 rounded border border-gray-200"
-                  />
+                <div class="mt-4 space-y-2">
+                  <div
+                    v-for="(option, idx) in q.options"
+                    :key="idx"
+                    class="p-2 border-l-4 border-gray-200"
+                  >
+                    <input
+                      type="text"
+                      :value="option.text"
+                      @input="updateOptionField(q, idx, 'text', $event.target.value)"
+                      class="w-full text-sm text-gray-700 bg-white p-1 rounded border border-gray-200"
+                      placeholder="Option Text"
+                    />
+                    <textarea
+                      :value="option.explanation"
+                      @input="updateOptionField(q, idx, 'explanation', $event.target.value)"
+                      rows="1"
+                      class="w-full text-xs text-gray-500 mt-1 bg-white p-1 rounded border border-gray-200"
+                      placeholder="Option Explanation"
+                    ></textarea>
+                    <textarea
+                      :value="option.recommendation"
+                      @input="updateOptionField(q, idx, 'recommendation', $event.target.value)"
+                      rows="1"
+                      class="w-full text-xs text-gray-500 mt-1 bg-white p-1 rounded border border-gray-200"
+                      placeholder="Option Recommendation"
+                    ></textarea>
+                    <div class="flex items-center mt-1">
+                      <label class="text-xs mr-2">Score:</label>
+                      <input
+                        type="number"
+                        :value="option.score"
+                        @input="updateOptionField(q, idx, 'score', parseFloat($event.target.value))"
+                        class="w-16 text-sm text-gray-700 bg-white p-1 rounded border border-gray-200"
+                      />
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
+          </draggable>
         </div>
-      </draggable>
-    </div>
-    <p v-else class="text-gray-500 text-center py-4">No questions added yet.</p>
+        <p v-else class="text-gray-500 text-center py-4">No questions added yet.</p>
+      </div>
+    </transition>
 
     <!-- Delete Confirmation Modal -->
     <transition name="fade">
@@ -328,6 +332,17 @@ function updateOptionField(question, optionIndex, field, value) {
 </template>
 
 <style scoped>
+/* Added for page transition */
+.page-fade-enter-active,
+.page-fade-leave-active {
+  transition: opacity 0.2s ease-out;
+}
+
+.page-fade-enter-from,
+.page-fade-leave-to {
+  opacity: 0;
+}
+
 /* Re-introducing animation styles for the question list */
 .question-list-move, /* apply transition to moving elements */
 .question-list-enter-active,

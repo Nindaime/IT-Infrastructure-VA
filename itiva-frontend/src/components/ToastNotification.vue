@@ -75,7 +75,7 @@ const iconPaths = {
     <div
       v-if="show"
       :class="[
-        'fixed top-5 right-5 w-auto max-w-md p-4 rounded-lg shadow-2xl text-white flex items-center z-[100]',
+        'fixed top-20 right-5 w-auto max-w-md p-4 rounded-lg shadow-2xl text-white flex items-center z-[100]',
         typeClasses[type] || 'bg-gray-800',
       ]"
       role="alert"

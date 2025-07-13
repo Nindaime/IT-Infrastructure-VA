@@ -110,7 +110,12 @@ function initializeAssessment(type) {
     const draft = assessmentStore.currentDraft
     // Validate that the draft has questions before assigning them.
     if (draft && Array.isArray(draft.questions) && draft.questions.length > 0) {
-      questions.value = draft.questions
+      // Sort questions by category, then by ID to ensure a consistent order for the progress bar.
+      questions.value = draft.questions.sort((a, b) => {
+        if (a.category < b.category) return -1
+        if (a.category > b.category) return 1
+        return a.id - b.id
+      })
       answers.value = { ...draft.answers }
       currentQuestionIndex.value = draft.lastQuestionIndex || 0 // Ensure index is valid
     } else {
@@ -339,7 +344,9 @@ function generateReportFromAnswers() {
         questionScore = normalizedImpact * maxImpactPerQuestion
 
         // If the answer is not perfect, generate a recommendation
-        if (impactValue < 2 && selectedOption.recommendation) {
+        // FIX: Ensure selectedOption is not null before accessing its properties.
+        // This handles cases where a question might be unanswered.
+        if (impactValue < 2 && selectedOption && selectedOption.recommendation) {
           allRecommendations.push({
             text: selectedOption.recommendation,
             category: q.category,
@@ -370,9 +377,11 @@ function resetStateAndStartNewDraft(type) {
   // questions.value = questionnairesStore.allQuestions.filter((q) => q.assessment_name === type)
   questions.value = questionnairesStore.allQuestions
     .filter((q) => q.assessment_name === type)
+    // Sort by category first, then by ID to ensure a logical progression for the user and progress bar.
     .sort((a, b) => {
-      // sort by ID numerically
-      return a.id - b.id
+      if (a.category < b.category) return -1
+      if (a.category > b.category) return 1
+      return a.id - b.id // Then sort by ID within the same category
     })
   answers.value = questions.value.reduce((acc, q) => ({ ...acc, [q.id]: null }), {})
   currentQuestionIndex.value = 0
@@ -413,6 +422,26 @@ async function handleReportNameSubmission() {
     // Optionally, show an error message if the name is empty
     alert('Please enter a name for your report.')
     return
+  }
+
+  // --- NEW: Validate that all questions have been answered ---
+  const unansweredQuestions = questions.value.filter((q) => !answers.value[q.id])
+
+  if (unansweredQuestions.length > 0) {
+    showReportNameModal.value = false // Close the name modal first
+    showToast(
+      `Please answer all questions to generate a report. You have ${unansweredQuestions.length} unanswered question(s).`,
+      'error',
+      4000,
+    )
+    // For better UX, navigate the user to the first unanswered question.
+    const firstUnansweredIndex = questions.value.findIndex(
+      (q) => q.id === unansweredQuestions[0].id,
+    )
+    if (firstUnansweredIndex !== -1) {
+      currentQuestionIndex.value = firstUnansweredIndex
+    }
+    return // Stop the submission process
   }
 
   try {
@@ -658,7 +687,7 @@ function handleKeyboardShortcuts(event) {
         </div>
 
         <!-- Questionnaire Container -->
-        <div class="relative pr-2">
+        <div class="relative">
           <transition name="fade" mode="out-in">
             <div :key="currentQuestion.id" v-if="currentQuestion">
               <div class="flex items-start justify-between gap-4 mb-6">
@@ -682,7 +711,7 @@ function handleKeyboardShortcuts(event) {
                     ></path>
                   </svg>
                   <div
-                    class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-72 p-3 text-sm text-white bg-gray-800 rounded-lg opacity-0 group-hover:opacity-95 transition-opacity duration-300 pointer-events-none z-10"
+                    class="absolute bottom-full right-0 mb-2 w-64 sm:w-72 p-3 text-sm text-white bg-gray-800 rounded-lg opacity-0 group-hover:opacity-95 transition-opacity duration-300 pointer-events-none z-10"
                     role="tooltip"
                   >
                     {{ currentQuestion.explanation }}
@@ -728,7 +757,7 @@ function handleKeyboardShortcuts(event) {
                     </svg>
                     <div
                       :id="`explanation-${currentQuestion.id}-${index}`"
-                      class="absolute bottom-full right-0 mb-2 w-72 p-3 text-sm text-white bg-gray-800 rounded-lg opacity-0 group-hover:opacity-95 transition-opacity duration-300 pointer-events-none z-10"
+                      class="absolute bottom-full right-0 mb-2 w-64 sm:w-72 p-3 text-sm text-white bg-gray-800 rounded-lg opacity-0 group-hover:opacity-95 transition-opacity duration-300 pointer-events-none z-10"
                       role="tooltip"
                     >
                       {{ option.explanation }}
@@ -752,7 +781,7 @@ function handleKeyboardShortcuts(event) {
                 ? 'Cannot go back, this is the first question'
                 : 'Go to previous question'
             "
-            class="px-6 py-2 cursor-pointer font-semibold text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed transition-colors focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
+            class="px-4 sm:px-6 py-2 text-sm sm:text-base cursor-pointer font-semibold text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed transition-colors focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
           >
             <svg
               class="w-4 h-4 mr-2 inline"
@@ -768,7 +797,8 @@ function handleKeyboardShortcuts(event) {
                 d="M15 19l-7-7 7-7"
               ></path>
             </svg>
-            Previous
+            <span class="hidden sm:inline">Previous</span>
+            <span class="sm:hidden">Prev</span>
           </button>
 
           <button
@@ -782,7 +812,7 @@ function handleKeyboardShortcuts(event) {
                 ? 'Please select an answer to continue'
                 : 'Go to next question'
             "
-            class="px-6 py-2 cursor-pointer font-semibold text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+            class="px-4 sm:px-6 py-2 text-sm sm:text-base cursor-pointer font-semibold text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
           >
             Next
             <svg
@@ -808,7 +838,7 @@ function handleKeyboardShortcuts(event) {
             @keydown.space.prevent="submitAssessment"
             :disabled="isSubmitting || !currentQuestion || !answers[currentQuestion.id]"
             :aria-label="isSubmitting ? 'Submitting assessment...' : 'Submit assessment'"
-            class="px-6 py-2 cursor-pointer font-semibold text-white bg-green-600 rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
+            class="px-4 sm:px-6 py-2 text-sm sm:text-base cursor-pointer font-semibold text-white bg-green-600 rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
           >
             <svg
               v-if="isSubmitting"
@@ -846,7 +876,11 @@ function handleKeyboardShortcuts(event) {
                 d="M5 13l4 4L19 7"
               ></path>
             </svg>
-            {{ isSubmitting ? 'Submitting...' : 'Submit Assessment' }}
+            <span v-if="isSubmitting">Submitting...</span>
+            <template v-else>
+              <span class="hidden sm:inline">Submit Assessment</span>
+              <span class="sm:hidden">Submit</span>
+            </template>
           </button>
         </div>
       </div>

@@ -211,7 +211,7 @@ function handleLogout() {
                         assessment.name !== assessmentType,
                     }"
                   >
-                    {{ type }}
+                    {{ assessment.name }}
                   </button>
                 </div>
               </transition>

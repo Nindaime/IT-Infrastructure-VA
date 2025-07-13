@@ -116,37 +116,32 @@ const averageScore = computed(() => {
   return avg.toFixed(1)
 })
 
-const previousAverageScore = computed(() => {
-  const reports = completedReports.value
-  if (reports.length === 0) return 'N/A'
-
-  const reportsByType = reports.reduce((acc, report) => {
+const scoreTrend = computed(() => {
+  const reportsByType = completedReports.value.reduce((acc, report) => {
     if (!acc[report.type]) acc[report.type] = []
     acc[report.type].push(report)
     return acc
   }, {})
 
-  const secondLatestScores = Object.values(reportsByType)
-    .map((group) => {
-      if (group.length < 2) return null // Not enough reports to have a "previous" one
-      const sortedGroup = group.sort((a, b) => new Date(b.date) - new Date(a.date))
-      return sortedGroup[1].score // The second latest report
-    })
-    .filter((score) => score !== null)
+  // Only consider types that have at least two reports to calculate a trend
+  const trendableGroups = Object.values(reportsByType).filter((group) => group.length >= 2)
 
-  if (secondLatestScores.length === 0) return 'N/A'
+  if (trendableGroups.length === 0) {
+    return 'neutral' // Not enough data for a trend
+  }
 
-  const sum = secondLatestScores.reduce((s, score) => s + score, 0)
-  return (sum / secondLatestScores.length).toFixed(1)
-})
+  const latestScores = trendableGroups.map(
+    (group) => group.sort((a, b) => new Date(b.date) - new Date(a.date))[0].score,
+  )
+  const previousScores = trendableGroups.map(
+    (group) => group.sort((a, b) => new Date(b.date) - new Date(a.date))[1].score,
+  )
 
-const scoreTrend = computed(() => {
-  const current = parseFloat(averageScore.value)
-  const previous = parseFloat(previousAverageScore.value)
+  const currentAvg = latestScores.reduce((sum, score) => sum + score, 0) / latestScores.length
+  const previousAvg = previousScores.reduce((sum, score) => sum + score, 0) / previousScores.length
 
-  if (isNaN(current) || isNaN(previous)) return 'neutral'
-  if (current > previous) return 'up'
-  if (current < previous) return 'down'
+  if (currentAvg > previousAvg) return 'up'
+  if (currentAvg < previousAvg) return 'down'
   return 'neutral'
 })
 
