@@ -25,6 +25,8 @@ const isMobile = ref(false)
 const isPortrait = ref(false)
 const showLandscapeSuggestion = ref(false)
 const isLockedLandscape = ref(false)
+const showRotateTooltip = ref(false)
+let tooltipTimer: number | null = null
 
 // --- End Import State ---
 
@@ -615,6 +617,11 @@ async function saveQuestionnaire() {
  */
 async function requestLandscape() {
   try {
+    // Many browsers require the page to be in fullscreen to lock orientation.
+    if (document.documentElement.requestFullscreen) {
+      await document.documentElement.requestFullscreen()
+    }
+
     if (screen.orientation && screen.orientation.lock) {
       await screen.orientation.lock('landscape')
       isLockedLandscape.value = true
@@ -627,7 +634,9 @@ async function requestLandscape() {
     let message = 'Could not switch to landscape. Please rotate your device manually.'
     if (error.name === 'NotSupportedError') {
       message =
-        'Rotation lock requires a secure (HTTPS) connection. Please rotate your device manually.'
+        'Rotation lock requires a secure (HTTPS) connection or is not supported in this context.'
+    } else if (error.name === 'SecurityError') {
+      message = 'Switching to landscape must be initiated by a user action, like a tap.'
     } else if (error.message.includes('not supported')) {
       message = error.message
     }
@@ -650,6 +659,12 @@ function unlockOrientation() {
       console.error('Could not unlock screen orientation:', error)
     }
   }
+  // If we entered fullscreen, we should exit it when unlocking.
+  if (document.fullscreenElement) {
+    document.exitFullscreen().catch((err) => {
+      console.error('Error exiting fullscreen:', err)
+    })
+  }
 }
 
 function checkOrientation() {
@@ -660,6 +675,19 @@ function checkOrientation() {
   if (!isPortrait.value) {
     showLandscapeSuggestion.value = false
   }
+}
+
+function startTooltipTimer() {
+  if (tooltipTimer) clearTimeout(tooltipTimer)
+  // Show tooltip after a short delay on long press
+  tooltipTimer = window.setTimeout(() => {
+    showRotateTooltip.value = true
+  }, 500)
+}
+
+function cancelTooltipTimer() {
+  if (tooltipTimer) clearTimeout(tooltipTimer)
+  showRotateTooltip.value = false
 }
 
 /**
@@ -1064,9 +1092,13 @@ watch(
       <button
         v-if="isMobile && isPortrait"
         @click="requestLandscape"
+        @mousedown="startTooltipTimer"
+        @mouseup="cancelTooltipTimer"
+        @mouseleave="cancelTooltipTimer"
+        @touchstart.passive="startTooltipTimer"
+        @touchend="cancelTooltipTimer"
         class="fixed top-20 right-4 bg-blue-600 text-white p-3 rounded-full shadow-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all z-30"
         aria-label="Switch to Landscape View"
-        title="Switch to Landscape View"
       >
         <svg
           class="w-6 h-6"
@@ -1084,6 +1116,17 @@ watch(
         </svg>
       </button>
     </transition>
+    <!-- Tooltip for long press on rotate button -->
+    <transition name="fade">
+      <div
+        v-if="showRotateTooltip"
+        class="fixed top-36 right-4 w-max max-w-[200px] bg-gray-900 text-white text-xs rounded-md py-1.5 px-3 shadow-lg z-40"
+        role="tooltip"
+      >
+        Rotate to Landscape for better user experience
+      </div>
+    </transition>
+
     <!-- Import Mode Selection Modal -->
     <transition name="fade">
       <div
