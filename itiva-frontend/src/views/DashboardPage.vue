@@ -163,6 +163,36 @@ const activeAssessments = computed(() =>
     })),
 )
 
+const draftNameMapping = computed(() => {
+  // Get drafts and sort them by creation date (oldest first) to ensure consistent numbering
+  const sortedDrafts = reportsForDisplay.value
+    .filter((r) => r.isDraft)
+    .sort((a, b) => new Date(a.date) - new Date(b.date))
+
+  // Create a map of draft.id -> sequential name
+  const map = new Map()
+  sortedDrafts.forEach((draft, index) => {
+    map.set(draft.id, `Draft Assessment ${index + 1}`)
+  })
+  return map
+})
+
+function getMobileDisplayName(report) {
+  let displayName
+  // If it's a draft, use the sequential name from the map
+  if (report.isDraft) {
+    displayName = draftNameMapping.value.get(report.id) || report.name
+  } else {
+    displayName = report.name
+  }
+
+  // Apply truncation logic for long names
+  if (displayName.length > 25) {
+    return displayName.substring(0, 22) + '...'
+  }
+
+  return displayName
+}
 // --- Grading Logic (copied for consistency) ---
 function getGrade(score) {
   if (score >= 85) return 'A'
@@ -478,9 +508,10 @@ function closeSystemTestPanel() {
           <div
             ref="reportsContainer"
             v-if="filteredReports.length > 0"
-            class="overflow-auto max-h-96 overflow-y-auto"
+            class="max-h-96 overflow-y-auto"
           >
-            <table class="min-w-full divide-y divide-gray-200">
+            <!-- Desktop Table View -->
+            <table class="hidden md:table min-w-full divide-y divide-gray-200">
               <thead class="bg-gray-50 sticky top-0">
                 <tr>
                   <th
@@ -626,6 +657,142 @@ function closeSystemTestPanel() {
                 </tr>
               </tbody>
             </table>
+            <!-- Mobile Card View -->
+            <div class="md:hidden space-y-3 p-1">
+              <div
+                v-for="report in filteredReports"
+                :key="report.id"
+                class="bg-white p-4 rounded-lg shadow-md border border-gray-200"
+              >
+                <div class="flex justify-between items-start">
+                  <div class="flex-grow pr-4">
+                    <h3 class="font-bold text-gray-800">
+                      {{ getMobileDisplayName(report) }}
+                    </h3>
+                    <p class="text-sm text-gray-500">{{ report.type }}</p>
+                    <p class="text-xs text-gray-400 mt-1">
+                      {{ report.date.replace('T', ' ').substring(0, 16) }}
+                    </p>
+                  </div>
+                  <div class="flex items-center space-x-3 flex-shrink-0">
+                    <button
+                      v-if="!report.isDraft"
+                      @click="viewReport(report)"
+                      class="text-blue-600 hover:text-blue-800 transition-colors"
+                      title="View Report"
+                    >
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        class="h-6 w-6"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        stroke-width="2"
+                      >
+                        <path
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                        />
+                        <path
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          d="M2.458 12C3.732 7.943 7.522 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7S3.732 16.057 2.458 12z"
+                        />
+                      </svg>
+                    </button>
+                    <button
+                      v-if="!isAdminView"
+                      @click="promptDeleteReport(report.id)"
+                      class="text-red-500 hover:text-red-700 transition-colors"
+                      :title="report.isDraft ? 'Delete Draft' : 'Delete Report'"
+                    >
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        class="h-6 w-6"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        stroke-width="2"
+                      >
+                        <path
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                        />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+
+                <div v-if="report.isDraft" class="mt-3">
+                  <div class="flex items-center justify-between">
+                    <span
+                      class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800"
+                    >
+                      <svg
+                        class="w-3 h-3 mr-1"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          stroke-width="2"
+                          d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                        ></path>
+                      </svg>
+                      Draft
+                    </span>
+                    <button
+                      v-if="!isAdminView"
+                      @click="continueAssessment(report)"
+                      class="flex items-center text-sm text-blue-600 font-semibold hover:text-blue-800 transition-colors"
+                      title="Continue Assessment"
+                    >
+                      Continue
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        class="h-4 w-4 ml-1"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        stroke-width="2"
+                      >
+                        <path
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          d="M13 7l5 5m0 0l-5 5m5-5H6"
+                        />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+
+                <div
+                  v-if="!report.isDraft"
+                  class="mt-4 flex justify-around items-center text-center bg-gray-50 p-2 rounded-md"
+                >
+                  <div>
+                    <p class="text-xs text-gray-500 uppercase font-semibold">Score</p>
+                    <p class="text-2xl font-bold" :class="getScoreColorClass(report.score)">
+                      {{ report.score }}
+                    </p>
+                  </div>
+                  <div class="border-l h-10 border-gray-200"></div>
+                  <div>
+                    <p class="text-xs text-gray-500 uppercase font-semibold">Grade</p>
+                    <p
+                      class="text-2xl font-bold"
+                      :class="getGradeColorClass(getGrade(report.score))"
+                    >
+                      {{ getGrade(report.score) }}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
           <!-- Message if no reports are available -->
           <div v-else class="text-center py-8 text-gray-500">

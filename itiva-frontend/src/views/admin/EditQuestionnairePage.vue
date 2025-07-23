@@ -28,6 +28,11 @@ const isLockedLandscape = ref(false)
 const showRotateTooltip = ref(false)
 let tooltipTimer: number | null = null
 
+// --- Undo/Redo State for Question Ordering ---
+const history = ref<any[]>([])
+const redoStack = ref<any[]>([])
+const MAX_HISTORY_SIZE = 20
+
 // --- End Import State ---
 
 // Define the type for the showToast function to help TypeScript understand its signature.
@@ -241,12 +246,20 @@ function addQuestion() {
  * @param {Array} newQuestionOrder The newly ordered array of questions.
  */
 function updateQuestionOrder(newQuestionOrder) {
+  // Save the current state to history before applying the change.
+  history.value.push(JSON.parse(JSON.stringify(questions.value)))
+  // Clear the redo stack as a new action has been taken.
+  redoStack.value = []
+  // Keep history size manageable.
+  if (history.value.length > MAX_HISTORY_SIZE) {
+    history.value.shift()
+  }
+
   const renumberedQuestions = newQuestionOrder.map((q, index) => ({
     ...q,
     id: index + 1, // Re-assign the ID based on the new index (1-based)
   }))
   questions.value = renumberedQuestions
-  // Provide subtle feedback that the order was saved.
   showToast('Question order updated.', 'success', 1500)
 }
 
@@ -698,6 +711,34 @@ function closeLandscapeSuggestion() {
 }
 
 /**
+ * Undoes the last change to the question order.
+ */
+function undoOrderChange() {
+  if (history.value.length > 0) {
+    // Move the current state to the redo stack
+    redoStack.value.push(JSON.parse(JSON.stringify(questions.value)))
+    // Restore the previous state from history
+    const previousState = history.value.pop()
+    questions.value = previousState
+    showToast('Undo successful.', 'info', 1500)
+  }
+}
+
+/**
+ * Redoes the last undone change to the question order.
+ */
+function redoOrderChange() {
+  if (redoStack.value.length > 0) {
+    // Move the current state back to the history stack
+    history.value.push(JSON.parse(JSON.stringify(questions.value)))
+    // Restore the next state from the redo stack
+    const nextState = redoStack.value.pop()
+    questions.value = nextState
+    showToast('Redo successful.', 'info', 1500)
+  }
+}
+
+/**
  * Navigates back to the admin dashboard.
  */
 function backToDashboard() {
@@ -841,6 +882,7 @@ watch(
             @remove-question="removeQuestion"
             @update:question="handleQuestionUpdate"
             @update:questions="updateQuestionOrder"
+            :scroll-container="mainContent"
           />
 
           <!-- Add New Question Form -->
@@ -1046,6 +1088,61 @@ watch(
         </div>
       </div>
     </main>
+
+    <!-- Undo/Redo Buttons -->
+    <transition name="fade">
+      <div
+        v-if="history.length > 0"
+        class="fixed top-20 z-30 w-full flex justify-center md:w-auto md:right-8"
+      >
+        <div
+          class="bg-white rounded-full shadow-lg p-1 flex items-center space-x-1 border border-gray-200"
+        >
+          <button
+            @click="undoOrderChange"
+            :disabled="history.length === 0"
+            class="p-2 rounded-full hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            title="Undo Order Change"
+          >
+            <svg
+              class="w-6 h-6 text-gray-600"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M9 15L3 9m0 0l6-6M3 9h12a6 6 0 010 12h-3"
+              ></path>
+            </svg>
+          </button>
+          <button
+            @click="redoOrderChange"
+            :disabled="redoStack.length === 0"
+            class="p-2 rounded-full hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            title="Redo Order Change"
+          >
+            <svg
+              class="w-6 h-6 text-gray-600"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M15 15l6-6m0 0l-6-6m6 6H9a6 6 0 000 12h3"
+              ></path>
+            </svg>
+          </button>
+        </div>
+      </div>
+    </transition>
 
     <!-- Landscape Suggestion Modal -->
     <transition name="fade">

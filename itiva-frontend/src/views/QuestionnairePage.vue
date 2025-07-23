@@ -711,6 +711,7 @@ function handleKeyboardShortcuts(event) {
                   <button
                     type="button"
                     @click.stop="toggleTooltip('question')"
+                    @touchend.prevent="toggleTooltip('question')"
                     class="focus:outline-none"
                     aria-label="Show question explanation"
                   >
@@ -764,6 +765,7 @@ function handleKeyboardShortcuts(event) {
                     <button
                       type="button"
                       @click.stop="toggleTooltip(`option-${index}`)"
+                      @touchend.prevent="toggleTooltip(`option-${index}`)"
                       class="focus:outline-none"
                       :aria-label="`Show explanation for option ${index + 1}`"
                     >
