@@ -1,6 +1,6 @@
 <!-- src/views/EditQuestionnairePage.vue -->
 <script setup lang="ts">
-import { ref, watch, computed, inject, onMounted, onBeforeUnmount } from 'vue'
+import { ref, watch, computed, inject, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useQuestionnairesStore } from '@/stores/questionnaires'
 import QuestionList from '@/components/admin/QuestionList.vue'
@@ -19,6 +19,12 @@ const showImportModal = ref(false)
 const importedQuestions = ref<any[]>([])
 const importMode = ref<'all' | 'sequence' | null>(null)
 const currentImportIndex = ref(0)
+
+// --- Landscape Mode State ---
+const isMobile = ref(false)
+const isPortrait = ref(false)
+const showLandscapeSuggestion = ref(false)
+const isLockedLandscape = ref(false)
 
 // --- End Import State ---
 
@@ -604,9 +610,70 @@ async function saveQuestionnaire() {
 }
 
 /**
+ * Requests the browser to lock the screen orientation to landscape.
+ * This is recommended for a better editing experience on mobile.
+ */
+async function requestLandscape() {
+  try {
+    if (screen.orientation && screen.orientation.lock) {
+      await screen.orientation.lock('landscape')
+      isLockedLandscape.value = true
+      showLandscapeSuggestion.value = false
+    } else {
+      throw new Error('The Screen Orientation API is not supported by this browser.')
+    }
+  } catch (error: any) {
+    console.error('Could not lock screen orientation:', error)
+    let message = 'Could not switch to landscape. Please rotate your device manually.'
+    if (error.name === 'NotSupportedError') {
+      message =
+        'Rotation lock requires a secure (HTTPS) connection. Please rotate your device manually.'
+    } else if (error.message.includes('not supported')) {
+      message = error.message
+    }
+    showToast(message, 'error', 5000)
+    // Hide the suggestion even if it fails, to not block the user.
+    showLandscapeSuggestion.value = false
+  }
+}
+
+/**
+ * Unlocks the screen orientation, returning control to the device's default behavior.
+ * This is called when navigating away from the page.
+ */
+function unlockOrientation() {
+  if (isLockedLandscape.value && screen.orientation && screen.orientation.unlock) {
+    try {
+      screen.orientation.unlock()
+      isLockedLandscape.value = false
+    } catch (error) {
+      console.error('Could not unlock screen orientation:', error)
+    }
+  }
+}
+
+function checkOrientation() {
+  isMobile.value = window.innerWidth < 768 // Simple check for mobile-sized screens
+  isPortrait.value = window.matchMedia('(orientation: portrait)').matches
+
+  // If user manually rotates to landscape, hide the modal.
+  if (!isPortrait.value) {
+    showLandscapeSuggestion.value = false
+  }
+}
+
+/**
+ * Closes the landscape suggestion modal without taking action.
+ */
+function closeLandscapeSuggestion() {
+  showLandscapeSuggestion.value = false
+}
+
+/**
  * Navigates back to the admin dashboard.
  */
 function backToDashboard() {
+  unlockOrientation() // Ensure orientation is unlocked before leaving
   router.push('/admin/dashboard')
 }
 
@@ -623,12 +690,27 @@ const scrollToTop = () => {
 }
 
 onMounted(() => {
+  // Add listeners for orientation and resize events
+  window.addEventListener('resize', checkOrientation)
+  window.addEventListener('orientationchange', checkOrientation)
+  // Perform an initial check when the component mounts
+  nextTick(() => {
+    isMobile.value = window.innerWidth < 768
+    isPortrait.value = window.matchMedia('(orientation: portrait)').matches
+    // Show suggestion only on initial load if on mobile and in portrait
+    if (isMobile.value && isPortrait.value) {
+      showLandscapeSuggestion.value = true
+    }
+  })
   window.addEventListener('scroll', handleScroll)
   // Note: The uiStore is not used here, but this pattern is kept for consistency
   // uiStore.setMainScrollContainer(mainContent.value)
 })
 
 onBeforeUnmount(() => {
+  unlockOrientation() // Critically, unlock orientation when leaving the page
+  window.removeEventListener('resize', checkOrientation)
+  window.removeEventListener('orientationchange', checkOrientation)
   window.removeEventListener('scroll', handleScroll)
   // uiStore.setMainScrollContainer(null)
 })
@@ -656,7 +738,10 @@ watch(
       class="bg-white shadow-sm py-4 px-6 flex justify-between items-center sticky top-0 z-20"
     >
       <div class="flex items-center">
-        <RouterLink to="/admin/dashboard" class="text-xl sm:text-2xl font-bold"
+        <RouterLink
+          to="/admin/dashboard"
+          @click="unlockOrientation"
+          class="text-xl sm:text-2xl font-bold"
           >IT<span class="text-blue-600">I</span>VA
           <span class="text-blue-600 hidden sm:inline">Admin</span></RouterLink
         >
@@ -934,6 +1019,71 @@ watch(
       </div>
     </main>
 
+    <!-- Landscape Suggestion Modal -->
+    <transition name="fade">
+      <div
+        v-if="showLandscapeSuggestion"
+        class="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center p-4 z-50"
+      >
+        <div class="bg-white rounded-lg shadow-xl p-6 max-w-sm w-full text-center relative">
+          <button
+            @click="closeLandscapeSuggestion"
+            class="absolute top-2 right-2 text-gray-400 hover:text-gray-600 p-1 rounded-full transition-colors"
+            aria-label="Close suggestion"
+          >
+            <svg
+              class="w-6 h-6"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M6 18L18 6M6 6l12 12"
+              ></path>
+            </svg>
+          </button>
+          <h3 class="text-xl font-bold text-gray-800 mb-4">Landscape View Recommended</h3>
+          <p class="text-gray-600 mb-6">
+            For the best experience managing questions, please switch to landscape view.
+          </p>
+          <button
+            @click="requestLandscape"
+            class="w-full cursor-pointer py-3 bg-blue-600 text-white rounded-md font-semibold hover:bg-blue-700 transition-colors"
+          >
+            Switch to Landscape
+          </button>
+        </div>
+      </div>
+    </transition>
+    <!-- Floating Landscape Button -->
+    <transition name="fade">
+      <button
+        v-if="isMobile && isPortrait"
+        @click="requestLandscape"
+        class="fixed top-20 right-4 bg-blue-600 text-white p-3 rounded-full shadow-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all z-30"
+        aria-label="Switch to Landscape View"
+        title="Switch to Landscape View"
+      >
+        <svg
+          class="w-6 h-6"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M20.49 15a9 9 0 0 1-14.85 3.36L1 14"
+          ></path>
+        </svg>
+      </button>
+    </transition>
     <!-- Import Mode Selection Modal -->
     <transition name="fade">
       <div
