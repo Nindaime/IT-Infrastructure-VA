@@ -1,4 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import { useAuth, useUser } from '@clerk/vue'
+import { watch } from 'vue'
+
 import HomePage from '@/views/HomePage.vue'
 import AboutUsPage from '@/views/AboutUsPage.vue'
 import LoginPage from '@/views/LoginPage.vue'
@@ -7,116 +10,124 @@ import QuestionnairePage from '@/views/QuestionnairePage.vue'
 import ReportViewerPage from '@/views/ReportViewerPage.vue'
 import AdminDashboardPage from '@/views/admin/AdminDashboardPage.vue'
 import EditQuestionnairePage from '@/views/admin/EditQuestionnairePage.vue'
-import LinkAccountsPage from '@/views/LinkAccountsPage.vue' // New import
+import LinkAccountsPage from '@/views/LinkAccountsPage.vue'
+import AccountVerificationPage from '@/views/AccountVerificationPage.vue'
+import AccountSettingsPage from '@/views/AccountSettingsPage.vue'
+import AdminApprovalsPage from '@/views/admin/AdminApprovalsPage.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
+    { path: '/', name: 'home', component: HomePage, meta: { showHeaderAndFooter: true } },
+    { path: '/about', name: 'about', component: AboutUsPage, meta: { showHeaderAndFooter: true } },
     {
-      path: '/',
-      name: 'home',
-      component: HomePage,
-      meta: { showHeaderAndFooter: true },
-    },
-    {
-      path: '/about',
-      name: 'about',
-      component: AboutUsPage,
-      meta: { showHeaderAndFooter: true },
-    },
-    {
-      path: '/login',
+      path: '/login/:catchAll(.*)*',
       name: 'login',
       component: LoginPage,
-      meta: { showHeaderAndFooter: false }, // To hide header/footer on this page
+      meta: { showHeaderAndFooter: false, viewKey: 'auth' },
+    },
+    {
+      path: '/sign-up/:catchAll(.*)*',
+      name: 'sign-up',
+      component: LoginPage,
+      meta: { showHeaderAndFooter: false, viewKey: 'auth' },
     },
     {
       path: '/dashboard',
       name: 'dashboard',
       component: DashboardPage,
-      // Meta flag to hide global header/footer, as DashboardPage will have its own
-      meta: { showHeaderAndFooter: false },
+      meta: { showHeaderAndFooter: false, requiresAuth: true },
     },
     {
       path: '/questionnaire/:type',
       name: 'questionnaire',
       component: QuestionnairePage,
-      meta: { showHeaderAndFooter: false },
+      meta: { showHeaderAndFooter: false, requiresAuth: true },
     },
     {
-      // path: '/report/:businessName?', // Make businessName optional
       path: '/report/:reportId',
-      name: 'ReportViewerPage', // Renamed for clarity in route push
+      name: 'ReportViewerPage',
       component: ReportViewerPage,
-      props: true, // Pass route params as props to the component
-      meta: { showHeaderAndFooter: false },
+      props: true,
+      meta: { showHeaderAndFooter: false, requiresAuth: true },
+    },
+    {
+      path: '/link-accounts',
+      name: 'linkAccounts',
+      component: LinkAccountsPage,
+      meta: { showHeaderAndFooter: false, requiresAuth: true },
+    },
+    {
+      path: '/verify-account',
+      name: 'verifyAccount',
+      component: AccountVerificationPage,
+      meta: { requiresAuth: true, showHeaderAndFooter: true },
+    },
+    {
+      path: '/account-settings',
+      name: 'account-settings',
+      component: AccountSettingsPage,
+      meta: { showHeaderAndFooter: true, requiresAuth: true },
     },
     // Admin Routes
     {
       path: '/admin/dashboard',
       name: 'adminDashboard',
       component: AdminDashboardPage,
-      meta: { showHeaderAndFooter: false }, // Admin pages use their own header
+      meta: { showHeaderAndFooter: false, requiresAuth: true, requiresAdmin: true },
     },
     {
       path: '/admin/questionnaire/:questionnaireId',
       name: 'adminQuestionnaire',
       component: EditQuestionnairePage,
-      meta: { showHeaderAndFooter: false },
+      meta: { showHeaderAndFooter: false, requiresAuth: true, requiresAdmin: true },
     },
-    // New route for linking accounts
     {
-      path: '/link-accounts',
-      name: 'linkAccounts',
-      component: LinkAccountsPage,
-      meta: { showHeaderAndFooter: false }, // Hide global header/footer for this page
+      path: '/admin/approvals',
+      name: 'adminApprovals',
+      component: AdminApprovalsPage,
+      meta: { requiresAuth: true, requiresAdmin: true },
     },
   ],
-  // eslint-disable-next-line no-unused-vars
-  scrollBehavior(to, from, savedPosition) {
-    // Always scroll to top
+  scrollBehavior() {
     return { top: 0 }
   },
 })
 
-// // Global navigation guard to handle draft saving
-// router.beforeEach(async (to, from, next) => {
-//   // Check if user is navigating away from questionnaire page
-//   if (from.name === 'questionnaire') {
-//     try {
-//       // Dynamically import stores to avoid circular dependencies
-//       const { useAssessmentStore } = await import('@/stores/assessment')
-//       const { useReportsStore } = await import('@/stores/reports')
+router.beforeEach(async (to, from, next) => {
+  const { isSignedIn, isLoaded } = useAuth()
+  const { user } = useUser()
 
-//       const assessmentStore = useAssessmentStore()
-//       const reportsStore = useReportsStore()
+  if (!isLoaded.value) {
+    await new Promise((resolve) => {
+      const unwatch = watch(isLoaded, (loaded) => {
+        if (loaded) {
+          unwatch()
+          resolve()
+        }
+      })
+    })
+  }
 
-//       // Check if there's an active draft
-//       if (assessmentStore.hasActiveDraft && assessmentStore.isDraftMode) {
-//         // Store the target route for later navigation
-//         const targetRoute = to.fullPath
+  const userRole = user.value?.publicMetadata?.role
 
-//         // Create a custom event to trigger the draft save modal
-//         const draftSaveEvent = new CustomEvent('show-draft-save-modal', {
-//           detail: {
-//             targetRoute,
-//             assessmentStore,
-//             reportsStore,
-//           },
-//         })
+  // Redirect authenticated admins to admin dashboard when they hit user-land entry points
+  const userEntryRoutes = ['home', 'login', 'sign-up', 'dashboard']
+  if (isSignedIn.value && userRole === 'admin' && userEntryRoutes.includes(to.name)) {
+    return next({ name: 'adminDashboard' })
+  }
 
-//         // Dispatch the event
-//         window.dispatchEvent(draftSaveEvent)
+  // Auth-wall for protected routes
+  if (to.meta.requiresAuth && !isSignedIn.value) {
+    return next({ name: 'login' })
+  }
 
-//         // Prevent immediate navigation
-//         return false
-//       }
-//     } catch (error) {
-//       console.error('Error in navigation guard:', error)
-//     }
-//   }
+  // Admin-wall for admin routes
+  if (to.meta.requiresAdmin && userRole !== 'admin') {
+    return next({ name: 'dashboard' })
+  }
 
-//   next()
-// })
+  return next()
+})
 
 export default router

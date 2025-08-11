@@ -11,6 +11,8 @@
     "format": "prettier --write src/"
   },
   "dependencies": {
+    "@clerk/themes": "^2.4.6",
+    "@clerk/vue": "^1.9.2",
     "@ilovepdf/ilovepdf-nodejs": "^0.3.1",
     "@vercel/analytics": "^1.5.0",
     "@vercel/speed-insights": "^1.2.0",

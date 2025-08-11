@@ -605,7 +605,7 @@ function handleKeyboardShortcuts(event) {
 </script>
 
 <template>
-  <div class="flex flex-col min-h-screen bg-gray-100">
+  <div class="flex flex-col min-h-screen bg-gray-100 dark:bg-gray-900">
     <!-- The unified header is used here, with 'New Assessment' hidden -->
     <AppHeader
       :user-name="authStore.userName"
@@ -616,13 +616,15 @@ function handleKeyboardShortcuts(event) {
     />
 
     <main class="flex-grow flex items-center justify-center p-4">
-      <div class="w-full max-w-3xl bg-white rounded-2xl shadow-2xl p-6 md:p-10 my-8">
+      <div
+        class="w-full max-w-3xl bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-6 md:p-10 my-8"
+      >
         <!-- Header Section -->
         <div class="text-center mb-8">
           <h1 class="text-xl sm:text-2xl md:text-3xl font-bold text-gray-800 break-words">
             {{ pageTitle }}
           </h1>
-          <p class="text-gray-500 mt-2">
+          <p class="text-gray-500 dark:text-gray-400 mt-2">
             Question {{ currentQuestionIndex + 1 }} of {{ totalQuestions }}
           </p>
           <!-- Draft indicator -->

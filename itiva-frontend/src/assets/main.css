@@ -1,37 +1,54 @@
+/* src/assets/main.css */
+
+/*
+  IMPORTANT: For Tailwind CSS v4.x, the correct way to include Tailwind's
+  base, components, and utilities is via a single '@import "tailwindcss";' directive.
+  This replaces the old '@tailwind base; @tailwind components; @tailwind utilities;' syntax.
+*/
 @import 'tailwindcss';
 
-/* Styles extracted from itiva-app_v4.html */
+/* Global body styles to ensure consistent fonts and background across the application.
+   These styles are applied universally. */
 body {
-  font-family: 'Inter', sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  /* Ensuring base text color and background are set if not by Tailwind */
-  /* @apply bg-gray-50 text-gray-800; */
+  font-family: 'Inter', sans-serif; /* Ensures the 'Inter' font is used throughout the app */
+  -webkit-font-smoothing: antialiased; /* Enhances font rendering for WebKit browsers (Chrome, Safari) */
+  -moz-osx-font-smoothing: grayscale; /* Enhances font rendering for Mozilla Firefox */
+  /* Applying a default light gray background and dark text color from Tailwind's palette */
+  @apply bg-gray-50 text-gray-800;
 }
 
+/* Vue Router Transition Styles for smooth page changes (fade effect) */
 .fade-enter-active,
 .fade-leave-active {
-  transition: opacity 0.3s ease;
+  transition: opacity 0.3s ease; /* Applies a smooth transition over 0.3 seconds */
 }
 
 .fade-enter-from,
 .fade-leave-to {
-  opacity: 0;
+  opacity: 0; /* Ensures the element starts or ends completely transparent for the fade effect */
 }
 
+/* Custom Scrollbar Styles for aesthetic improvements in scrollable areas.
+   These styles target Webkit-based browsers (Chrome, Safari, Edge). */
 .custom-scrollbar::-webkit-scrollbar {
-  width: 6px;
+  width: 8px; /* Sets the width of the scrollbar */
 }
 
 .custom-scrollbar::-webkit-scrollbar-track {
-  background: #f1f1f1;
+  background: #f0f0f0; /* Light gray background for the scrollbar track */
+  border-radius: 4px; /* Rounded corners for the track */
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: #888;
-  border-radius: 3px;
+  background: #a0a0a0; /* Darker gray color for the scrollable thumb */
+  border-radius: 4px; /* Rounded corners for the thumb */
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: #555;
+  background: #888; /* Even darker gray when hovering over the scrollbar thumb */
+}
+
+/* Custom utility class for interactive elements to provide a consistent focus ring */
+.focus-ring-blue:focus {
+  @apply ring-2 ring-offset-2 ring-blue-500 outline-none; /* Adds a blue focus ring with offset */
 }

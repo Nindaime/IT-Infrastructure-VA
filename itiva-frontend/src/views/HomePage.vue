@@ -1,99 +1,15 @@
 <!-- src/views/HomePage.vue - Major rebuild based on new layout and grading requirements -->
 <script setup>
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
-import { useAuthStore } from '@/stores/auth'
-import { useReportsStore } from '@/stores/reports'
-import { useQuestionnairesStore } from '@/stores/questionnaires'
+import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { mockRankings } from '@/api/mockData' // Assuming mockRankings is structured as per previous definition
 
 // Initialize the router for programmatic navigation
 const router = useRouter()
 
-const showScrollTopButton = ref(false)
-
-const handleScroll = () => {
-  // Show button after scrolling down 400px
-  showScrollTopButton.value = window.scrollY > 400
-}
-
-const scrollToTop = () => {
-  window.scrollTo({
-    top: 0,
-    behavior: 'smooth',
-  })
-}
-
-onMounted(() => {
-  window.addEventListener('scroll', handleScroll)
-})
-
-onBeforeUnmount(() => {
-  window.removeEventListener('scroll', handleScroll)
-})
-
-const authStore = useAuthStore()
-const reportsStore = useReportsStore()
-const questionnairesStore = useQuestionnairesStore()
-
-const rankings = computed(() => {
-  // 1. Adjust mock businesses to ensure they have a B grade or higher
-  const adjustedMockBusinesses = mockRankings.map((biz) => {
-    let score = biz.score
-    // If score is C grade (65-74) or D/E grade (<65), bump it to a B or A grade.
-    if (score < 75) {
-      // Randomly assign a B or A grade score (75-95)
-      score = 75 + Math.random() * 20
-    }
-    return {
-      ...biz,
-      score: score,
-      id: `mock-${biz.rank}`,
-      isRealUser: false,
-    }
-  })
-
-  // 2. Get real users who qualify
-  const activeQuestionnaireNames = questionnairesStore.questionnaires
-    .filter((q) => q.status === 'Active')
-    .map((q) => q.name)
-
-  const totalActiveQuestionnaires = activeQuestionnaireNames.length
-  const users = authStore.users.filter((u) => !u.isAdmin)
-
-  const qualifiedUserBusinesses = users
-    .map((user) => {
-      const result = reportsStore.calculateUserAverageScoreAndReports(
-        user.id,
-        activeQuestionnaireNames,
-      )
-      if (!result) return null
-
-      const { averageScore, latestReports } = result
-
-      // Conditions: Must have completed ALL active questionnaires and have a score of 75+
-      if (latestReports.length < totalActiveQuestionnaires || averageScore < 75) {
-        return null
-      }
-
-      return {
-        id: `user-${user.id}`,
-        name: user.companyName || user.userFullName,
-        location: user.city || 'N/A',
-        type: user.businessType || 'N/A',
-        score: averageScore,
-        isRealUser: true,
-      }
-    })
-    .filter(Boolean) // Remove nulls
-
-  // 3. Combine, sort, and rank
-  const combined = [...adjustedMockBusinesses, ...qualifiedUserBusinesses]
-  combined.sort((a, b) => b.score - a.score)
-  // Take only the top 10 businesses for the rankings
-  const top10 = combined.slice(0, 10)
-  return top10.map((biz, index) => ({ ...biz, rank: index + 1 }))
-})
+// Reactive reference for the list of mock rankings
+// Limiting to 10 companies as requested
+const rankings = ref(mockRankings.slice(0, 10))
 
 // --- Grading Logic ---
 /**
@@ -173,21 +89,33 @@ const rankingsByType = computed(() => {
   )
 })
 
-// // Initialize the auth store
-// const authStore = useAuthStore()
-// const assessmentStore = useAssessmentStore()
-
 /**
  * Navigates the user to the login page to start an assessment.
  */
 function navigateToLogin() {
   router.push('/login')
 }
+
+/**
+ * Navigates to the ReportViewerPage, passing the selected business's report data.
+ * @param {object} biz The business object whose report is to be viewed.
+ * Note: The right pane for report summary has been removed from homepage.
+ * This function will now directly navigate to the ReportViewerPage.
+ */
+function viewReport(biz) {
+  router.push({
+    name: 'ReportViewerPage',
+    params: { report: JSON.stringify(biz.report), name: biz.name },
+  })
+}
 </script>
+
 <template>
   <div class="font-sans">
     <!-- Hero Section: Grand, eye-catching introduction with gradient background and shadow -->
-    <div class="bg-gradient-to-r from-blue-600 to-indigo-700 text-white py-20 md:py-22 shadow-xl">
+    <div
+      class="bg-gradient-to-r from-blue-600 to-indigo-700 text-white py-20 md:py-32 shadow-xl rounded-b-3xl"
+    >
       <div class="container mx-auto px-6 text-center">
         <!-- Main Heading: Large, bold, responsive text with yellow highlight for "AI-Powered" -->
         <h1 class="text-4xl md:text-6xl font-extrabold leading-tight mb-6">
@@ -197,175 +125,21 @@ function navigateToLogin() {
         <!-- Sub-heading/Description: Readable text, centered, with slight opacity -->
         <p class="text-lg md:text-xl max-w-3xl mx-auto mb-10 opacity-90">
           ITIVA (IT Infrastructure Vulnerability Assessment) is an intelligent platform that helps
-          businesses globally identify, analyze, and mitigate security risks across their digital
+          businesses in the UK identify, analyze, and mitigate security risks across their digital
           infrastructure.
         </p>
         <!-- Call to Action Button: Prominent, white background, blue text, interactive hover effects -->
         <button
           @click="navigateToLogin"
-          class="bg-white text-blue-700 cursor-pointer font-bold py-4 px-10 rounded-full text-lg hover:bg-gray-100 transition-transform transform hover:scale-105 shadow-2xl"
+          class="bg-white text-blue-700 font-bold py-4 px-10 rounded-full text-lg hover:bg-gray-100 transition-transform transform hover:scale-105 shadow-2xl"
         >
           Start Your Free Assessment
         </button>
       </div>
     </div>
 
-    <section id="rankings" class="py-20 bg-gray-50/70">
-      <div class="container mx-auto px-6">
-        <div class="text-center mb-12">
-          <h2 class="text-3xl md:text-4xl font-bold text-gray-800">
-            Top Secure Businesses Globally
-          </h2>
-          <p class="text-gray-600 mt-4 max-w-2xl mx-auto mb-8">
-            Discover top-ranked businesses based on their comprehensive ITIVA vulnerability score,
-            grouped by various criteria.
-          </p>
-          <!-- Removed "Group by:" and filter buttons as per new requirements -->
-        </div>
-
-        <!-- Three-Column Ranking Display Area: Grid layout for distinct ranking views -->
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          <!-- Column 1: Business Ranking by Rating -->
-          <div
-            class="bg-white rounded-2xl shadow-xl flex flex-col overflow-hidden border border-gray-200"
-          >
-            <div class="p-6 border-b border-gray-200 bg-blue-50">
-              <h3 class="text-xl font-bold text-blue-800">Business Ranking by Rating</h3>
-            </div>
-            <div class="overflow-y-auto custom-scrollbar flex-grow p-4 min-h-[400px]">
-              <ul class="space-y-1">
-                <li
-                  v-for="item in rankingsByRating"
-                  :key="item.rank"
-                  class="p-3 rounded-lg flex items-center justify-between"
-                >
-                  <div class="flex items-center truncate">
-                    <span class="font-bold text-gray-400 mr-3 w-6 text-center flex-shrink-0">{{
-                      item.rank
-                    }}</span>
-                    <div class="truncate">
-                      <!-- Increased font size for company name as requested -->
-                      <p class="font-bold text-gray-800 text-base truncate">{{ item.name }}</p>
-                      <p class="text-xs text-gray-500 truncate">
-                        {{ item.location }} - {{ item.type }}
-                      </p>
-                    </div>
-                  </div>
-                  <!-- Grade display with conditional color -->
-                  <span
-                    class="font-extrabold text-base flex-shrink-0 ml-2"
-                    :class="getGradeColorClass(getGrade(item.score))"
-                  >
-                    {{ getGrade(item.score) }}
-                  </span>
-                </li>
-              </ul>
-            </div>
-          </div>
-
-          <!-- Column 2: Business Ranking by Location -->
-          <div
-            class="bg-white rounded-2xl shadow-xl flex flex-col overflow-hidden border border-gray-200"
-          >
-            <div class="p-6 border-b border-gray-200 bg-green-50">
-              <h3 class="text-xl font-bold text-green-800">Business Ranking by Location</h3>
-            </div>
-            <div class="overflow-y-auto custom-scrollbar flex-grow p-4 min-h-[400px]">
-              <div
-                v-for="(group, groupName) in rankingsByLocation"
-                :key="groupName"
-                class="mb-1 last:mb-0"
-              >
-                <h4
-                  class="font-semibold text-sm text-green-800 bg-green-100 px-4 py-2 rounded-md mb-1 sticky top-0 z-10 shadow-sm"
-                >
-                  {{ groupName }}
-                </h4>
-                <ul class="space-y-1">
-                  <li
-                    v-for="item in group"
-                    :key="item.rank"
-                    class="p-1 rounded-lg flex items-center justify-between"
-                  >
-                    <div class="flex items-center truncate">
-                      <span class="font-bold text-gray-400 mr-3 w-6 text-center flex-shrink-0">{{
-                        item.rank
-                      }}</span>
-                      <div class="truncate">
-                        <!-- Increased font size for company name as requested -->
-                        <p class="font-bold text-gray-800 text-base truncate">{{ item.name }}</p>
-                        <p class="text-xs text-gray-500 truncate">
-                          {{ item.location }} - {{ item.type }}
-                        </p>
-                      </div>
-                    </div>
-                    <!-- Grade display with conditional color -->
-                    <span
-                      class="font-extrabold text-base flex-shrink-0 ml-2"
-                      :class="getGradeColorClass(getGrade(item.score))"
-                    >
-                      {{ getGrade(item.score) }}
-                    </span>
-                  </li>
-                </ul>
-              </div>
-            </div>
-          </div>
-
-          <!-- Column 3: Business Ranking by Type -->
-          <div
-            class="bg-white rounded-2xl shadow-xl flex flex-col overflow-hidden border border-gray-200"
-          >
-            <div class="p-6 border-b border-gray-200 bg-purple-50">
-              <h3 class="text-xl font-bold text-purple-800">Business Ranking by Type</h3>
-            </div>
-            <div class="overflow-y-auto custom-scrollbar flex-grow p-4 min-h-[400px]">
-              <div
-                v-for="(group, groupName) in rankingsByType"
-                :key="groupName"
-                class="mb-1 last:mb-0"
-              >
-                <h4
-                  class="font-semibold text-sm text-purple-800 bg-purple-100 px-4 py-2 rounded-md mb-1 sticky top-0 z-10 shadow-sm"
-                >
-                  {{ groupName }}
-                </h4>
-                <ul class="space-y-1">
-                  <li
-                    v-for="item in group"
-                    :key="item.rank"
-                    class="p-1 rounded-lg flex items-center justify-between"
-                  >
-                    <div class="flex items-center truncate">
-                      <span class="font-bold text-gray-400 mr-3 w-6 text-center flex-shrink-0">{{
-                        item.rank
-                      }}</span>
-                      <div class="truncate">
-                        <!-- Increased font size for company name as requested -->
-                        <p class="font-bold text-gray-800 text-base truncate">{{ item.name }}</p>
-                        <p class="text-xs text-gray-500 truncate">
-                          {{ item.location }} - {{ item.type }}
-                        </p>
-                      </div>
-                    </div>
-                    <!-- Grade display with conditional color -->
-                    <span
-                      class="font-extrabold text-base flex-shrink-0 ml-2"
-                      :class="getGradeColorClass(getGrade(item.score))"
-                    >
-                      {{ getGrade(item.score) }}
-                    </span>
-                  </li>
-                </ul>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-
     <!-- How It Works Section - Reintroduced and updated content -->
-    <section id="how-it-works" class="py-20 bg-white">
+    <section id="how-it-works" class="py-20 bg-gray-50/70">
       <div class="container mx-auto px-6">
         <h2 class="text-3xl md:text-4xl font-bold text-gray-800 text-center mb-12">How It Works</h2>
         <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
@@ -416,7 +190,7 @@ function navigateToLogin() {
     </section>
 
     <!-- Platform Features Section - Reintroduced -->
-    <section id="features" class="py-20 bg-gray-50/70">
+    <section id="features" class="py-20 bg-white">
       <div class="container mx-auto px-6">
         <h2 class="text-3xl md:text-4xl font-bold text-gray-800 text-center mb-12">
           Platform Features
@@ -438,7 +212,7 @@ function navigateToLogin() {
                   stroke-linecap="round"
                   stroke-linejoin="round"
                   stroke-width="2"
-                  d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 20.944a11.955 11.955 0 0118 0 12.02 12.02 0 00-3.382-9.984z"
+                  d="M9.75 17L9 20l-1 1h4l-1-1v-3.25m-6.096 1.408l-3.003-3.004C2.012 10.612 0 8.874 0 7c0-1.79 1.41-3.266 3-3.896c1.59-.63 3.23-1.004 4.5-.604c1.27.4 2.378 1.547 3 2.896M21 7c0 1.79-1.41 3.266-3 3.896c-1.59.63-3.23 1.004-4.5.604c-1.27-.4-2.378-1.547-3-2.896"
                 ></path>
               </svg>
             </div>
@@ -494,7 +268,7 @@ function navigateToLogin() {
                   stroke-linecap="round"
                   stroke-linejoin="round"
                   stroke-width="2"
-                  d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"
+                  d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v4m0 0a2 2 0 100 4m0-4a2 2 0 110 4m0 4v2m0-6H4m6 0h10m6-6v10m0-10a2 2 0 100-4m0 4a2 2 0 110-4m0 4H4"
                 ></path>
               </svg>
             </div>
@@ -522,7 +296,7 @@ function navigateToLogin() {
                   stroke-linecap="round"
                   stroke-linejoin="round"
                   stroke-width="2"
-                  d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V7a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                  d="M12 8c1.657 0 3 1.343 3 3v2a3 3 0 01-3 3m0-12c1.657 0 3 1.343 3 3v2a3 3 0 01-3 3m0-12a9 9 0 100 18A9 9 0 0012 8z"
                 ></path>
               </svg>
             </div>
@@ -577,7 +351,7 @@ function navigateToLogin() {
                   stroke-linecap="round"
                   stroke-linejoin="round"
                   stroke-width="2"
-                  d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"
+                  d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.105A9.764 9.764 0 015 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
                 ></path>
               </svg>
             </div>
@@ -594,6 +368,160 @@ function navigateToLogin() {
     </section>
 
     <!-- UK's Most Secure Businesses Section - Modified for 3-column layout -->
+    <section id="rankings" class="py-20 bg-gray-50/70">
+      <div class="container mx-auto px-6">
+        <div class="text-center mb-12">
+          <h2 class="text-3xl md:text-4xl font-bold text-gray-800">UK's Most Secure Businesses</h2>
+          <p class="text-gray-600 mt-4 max-w-2xl mx-auto mb-8">
+            Discover the top-ranked businesses based on their comprehensive ITIVA vulnerability
+            score, grouped by various criteria.
+          </p>
+          <!-- Removed "Group by:" and filter buttons as per new requirements -->
+        </div>
+
+        <!-- Three-Column Ranking Display Area: Grid layout for distinct ranking views -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          <!-- Column 1: Business Ranking by Rating -->
+          <div
+            class="bg-white rounded-2xl shadow-xl flex flex-col overflow-hidden border border-gray-200"
+          >
+            <div class="p-6 border-b border-gray-200 bg-blue-50">
+              <h3 class="text-xl font-bold text-blue-800">Business Ranking by Rating</h3>
+            </div>
+            <div class="overflow-y-auto custom-scrollbar flex-grow p-4 min-h-[400px]">
+              <ul class="space-y-1">
+                <li
+                  v-for="item in rankingsByRating"
+                  :key="item.rank"
+                  @click="viewReport(item)"
+                  class="p-3 rounded-lg cursor-pointer flex items-center justify-between transition-all duration-200 hover:bg-gray-50"
+                >
+                  <div class="flex items-center truncate">
+                    <span class="font-bold text-gray-400 mr-3 w-6 text-center flex-shrink-0">{{
+                      item.rank
+                    }}</span>
+                    <div class="truncate">
+                      <!-- Increased font size for company name as requested -->
+                      <p class="font-bold text-gray-800 text-base truncate">{{ item.name }}</p>
+                      <p class="text-xs text-gray-500 truncate">
+                        {{ item.location }} - {{ item.type }}
+                      </p>
+                    </div>
+                  </div>
+                  <!-- Grade display with conditional color -->
+                  <span
+                    class="font-extrabold text-base flex-shrink-0 ml-2"
+                    :class="getGradeColorClass(getGrade(item.score))"
+                  >
+                    {{ getGrade(item.score) }}
+                  </span>
+                </li>
+              </ul>
+            </div>
+          </div>
+
+          <!-- Column 2: Business Ranking by Location -->
+          <div
+            class="bg-white rounded-2xl shadow-xl flex flex-col overflow-hidden border border-gray-200"
+          >
+            <div class="p-6 border-b border-gray-200 bg-green-50">
+              <h3 class="text-xl font-bold text-green-800">Business Ranking by Location</h3>
+            </div>
+            <div class="overflow-y-auto custom-scrollbar flex-grow p-4 min-h-[400px]">
+              <div
+                v-for="(group, groupName) in rankingsByLocation"
+                :key="groupName"
+                class="mb-4 last:mb-0"
+              >
+                <h4
+                  class="font-semibold text-sm text-green-800 bg-green-100 px-4 py-2 rounded-md mb-2 sticky top-0 z-10 shadow-sm"
+                >
+                  {{ groupName }}
+                </h4>
+                <ul class="space-y-1">
+                  <li
+                    v-for="item in group"
+                    :key="item.rank"
+                    @click="viewReport(item)"
+                    class="p-3 rounded-lg cursor-pointer flex items-center justify-between transition-all duration-200 hover:bg-gray-50"
+                  >
+                    <div class="flex items-center truncate">
+                      <span class="font-bold text-gray-400 mr-3 w-6 text-center flex-shrink-0">{{
+                        item.rank
+                      }}</span>
+                      <div class="truncate">
+                        <!-- Increased font size for company name as requested -->
+                        <p class="font-bold text-gray-800 text-base truncate">{{ item.name }}</p>
+                        <p class="text-xs text-gray-500 truncate">
+                          {{ item.location }} - {{ item.type }}
+                        </p>
+                      </div>
+                    </div>
+                    <!-- Grade display with conditional color -->
+                    <span
+                      class="font-extrabold text-base flex-shrink-0 ml-2"
+                      :class="getGradeColorClass(getGrade(item.score))"
+                    >
+                      {{ getGrade(item.score) }}
+                    </span>
+                  </li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
+          <!-- Column 3: Business Ranking by Type -->
+          <div
+            class="bg-white rounded-2xl shadow-xl flex flex-col overflow-hidden border border-gray-200"
+          >
+            <div class="p-6 border-b border-gray-200 bg-purple-50">
+              <h3 class="text-xl font-bold text-purple-800">Business Ranking by Type</h3>
+            </div>
+            <div class="overflow-y-auto custom-scrollbar flex-grow p-4 min-h-[400px]">
+              <div
+                v-for="(group, groupName) in rankingsByType"
+                :key="groupName"
+                class="mb-4 last:mb-0"
+              >
+                <h4
+                  class="font-semibold text-sm text-purple-800 bg-purple-100 px-4 py-2 rounded-md mb-2 sticky top-0 z-10 shadow-sm"
+                >
+                  {{ groupName }}
+                </h4>
+                <ul class="space-y-1">
+                  <li
+                    v-for="item in group"
+                    :key="item.rank"
+                    @click="viewReport(item)"
+                    class="p-3 rounded-lg cursor-pointer flex items-center justify-between transition-all duration-200 hover:bg-gray-50"
+                  >
+                    <div class="flex items-center truncate">
+                      <span class="font-bold text-gray-400 mr-3 w-6 text-center flex-shrink-0">{{
+                        item.rank
+                      }}</span>
+                      <div class="truncate">
+                        <!-- Increased font size for company name as requested -->
+                        <p class="font-bold text-gray-800 text-base truncate">{{ item.name }}</p>
+                        <p class="text-xs text-gray-500 truncate">
+                          {{ item.location }} - {{ item.type }}
+                        </p>
+                      </div>
+                    </div>
+                    <!-- Grade display with conditional color -->
+                    <span
+                      class="font-extrabold text-base flex-shrink-0 ml-2"
+                      :class="getGradeColorClass(getGrade(item.score))"
+                    >
+                      {{ getGrade(item.score) }}
+                    </span>
+                  </li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
 
     <!-- About Us Section Placeholder: Calls to action to learn more -->
     <section id="about" class="py-20 bg-white">
@@ -614,33 +542,4 @@ function navigateToLogin() {
       </div>
     </section>
   </div>
-  <!-- Scroll-to-top Button -->
-  <transition name="fade">
-    <button
-      v-if="showScrollTopButton"
-      @click="scrollToTop"
-      class="fixed bottom-8 cursor-pointer right-8 bg-blue-600 text-white p-3 rounded-full shadow-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all z-50"
-      aria-label="Scroll to top"
-    >
-      <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          stroke-width="2"
-          d="M5 15l7-7 7 7"
-        ></path>
-      </svg>
-    </button>
-  </transition>
 </template>
-
-<style scoped>
-.fade-enter-active,
-.fade-leave-active {
-  transition: opacity 0.3s ease;
-}
-.fade-enter-from,
-.fade-leave-to {
-  opacity: 0;
-}
-</style>
