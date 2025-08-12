@@ -399,7 +399,7 @@ async function downloadReportAsPDF() {
     pdf.text(restOfText, margin + generatedTextWidth + reportNameWidth, y)
 
     y += 18
-    pdf.text(`For: ${authStore.currentUser?.companyName || 'Your Business'}`, margin, y)
+    pdf.text(`For: ${companyNameToDisplay.value}`, margin, y)
 
     // Main Content
     y = headerHeight + 40
@@ -817,7 +817,7 @@ onMounted(() => {
               {{ generatedDate }} by ITIVA
             </p>
             <p class="text-xl text-gray-300">
-              For: {{ authStore.currentUser?.companyName || 'Your Business' }}
+              For: {{ companyNameToDisplay }}
             </p>
           </header>
           <main class="p-12">

@@ -50,6 +50,11 @@ export const useAuthStore = defineStore('auth', () => {
     return u?.publicMetadata?.role === 'admin'
   })
 
+  const companyName = computed(() => {
+    const u = currentUser.value
+    return u?.publicMetadata?.companyName || ''
+  })
+
   watch(
     [isSignedIn, user, isLoaded],
     ([newIsSignedIn, newUser, newIsLoaded]) => {

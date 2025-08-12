@@ -451,14 +451,8 @@ async function handleReportNameSubmission() {
 
   try {
     const reportName = newReportName.value.trim()
-    showReportNameModal.value = false
-
-    // Show loading/success modal
     isSubmitting.value = true
     isLoading.value = true
-    await new Promise((resolve) => setTimeout(resolve, 500)) // Simulate processing
-    isLoading.value = false
-    showSuccessModal.value = true
 
     // Generate report
     const report = generateReportFromAnswers()
@@ -480,6 +474,11 @@ async function handleReportNameSubmission() {
       report: report,
     })
 
+    showReportNameModal.value = false
+    await new Promise((resolve) => setTimeout(resolve, 500)) // Simulate processing
+    isLoading.value = false
+    showSuccessModal.value = true
+
     // After successfully creating the report and deleting the old draft,
     // we should now clear the active assessment session from the store.
     assessmentStore.clearDraft()
@@ -494,11 +493,22 @@ async function handleReportNameSubmission() {
     await router.push({ name: 'ReportViewerPage', params: { reportId: newCompletedReport.id } })
   } catch (error) {
     console.error('Error during report submission or navigation:', error)
-    showToast('Failed to finalize report. Please try again.', 'error')
-    // Reset state in case of failure
-    isNavigatingAfterSubmit.value = false
+
+    // Stop loading indicators
     isSubmitting.value = false
+    isLoading.value = false
     showSuccessModal.value = false
+
+    if (error.message.includes('A report with this name already exists')) {
+      showToast('Report name already exists, try another name', 'error')
+      // The modal is kept open for the user to enter a new name.
+    } else {
+      showToast('Failed to finalize report. Please try again.', 'error')
+      showReportNameModal.value = false // Close modal for other errors
+    }
+
+    // Reset navigation flag
+    isNavigatingAfterSubmit.value = false
   }
 }
 
@@ -653,18 +663,18 @@ function handleKeyboardShortcuts(event) {
               <p class="font-medium mb-1">Keyboard shortcuts:</p>
               <ul class="space-y-1">
                 <li>
-                  <kbd class="px-1 py-0.5 bg-gray-200 rounded text-xs">←</kbd> Previous question
+                  <kbd class="px-1 py-0.5 bg-gray-900 rounded text-xs">←</kbd> Previous question
                 </li>
                 <li>
-                  <kbd class="px-1 py-0.5 bg-gray-200 rounded text-xs">→</kbd> or
-                  <kbd class="px-1 py-0.5 bg-gray-200 rounded text-xs">Space</kbd> Next question
+                  <kbd class="px-1 py-0.5 bg-gray-900 rounded text-xs">→</kbd> or
+                  <kbd class="px-1 py-0.5 bg-gray-900 rounded text-xs">Space</kbd> Next question
                 </li>
                 <li>
-                  <kbd class="px-1 py-0.5 bg-gray-200 rounded text-xs">1-5</kbd> Select answer
+                  <kbd class="px-1 py-0.5 bg-gray-900 rounded text-xs">1-5</kbd> Select answer
                   option
                 </li>
                 <li>
-                  <kbd class="px-1 py-0.5 bg-gray-200 rounded text-xs">Enter</kbd> Submit assessment
+                  <kbd class="px-1 py-0.5 bg-gray-900 rounded text-xs">Enter</kbd> Submit assessment
                   (on last question)
                 </li>
               </ul>
@@ -690,11 +700,13 @@ function handleKeyboardShortcuts(event) {
               ></div>
             </div>
           </div>
-          <div class="flex justify-between mt-2 text-xs font-semibold text-gray-500">
+          <div
+            class="flex justify-between mt-2 text-xs font-semibold text-gray-500 dark:text-gray-400"
+          >
             <span
               v-for="category in categories"
               :key="`label-${category}`"
-              class="flex-1 text-center px-1"
+              class="flex-1 text-center px-1 text-gray-500 dark:text-gray-400"
             >
               {{ category }}
             </span>
@@ -706,7 +718,9 @@ function handleKeyboardShortcuts(event) {
           <transition name="fade" mode="out-in">
             <div :key="currentQuestion.id" v-if="currentQuestion">
               <div class="flex items-start justify-between gap-4 mb-6">
-                <h2 class="text-xl md:text-2xl font-semibold text-gray-700 dark:text-white leading-tight">
+                <h2
+                  class="text-xl md:text-2xl font-semibold text-gray-700 dark:text-gray-300 leading-tight"
+                >
                   {{ currentQuestion.text }}
                 </h2>
                 <div class="relative group flex-shrink-0">
@@ -718,7 +732,7 @@ function handleKeyboardShortcuts(event) {
                     aria-label="Show question explanation"
                   >
                     <svg
-                      class="w-6 h-6 text-gray-400 cursor-pointer group-hover:text-blue-600 transition-colors"
+                      class="w-6 h-6 text-gray-300 cursor-pointer group-hover:text-blue-600 transition-colors"
                       fill="none"
                       stroke="currentColor"
                       viewBox="0 0 24 24"
@@ -754,15 +768,23 @@ function handleKeyboardShortcuts(event) {
                   role="radio"
                   :aria-checked="answers[currentQuestion.id]?.text === option.text"
                   tabindex="0"
-                  class="w-full cursor-pointer text-left p-4 border-2 rounded-lg text-gray-700 dark:text-white hover:text-gray-900 dark:hover:text-gray-900 transition-all duration-200 flex items-center justify-between focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                  class="w-full cursor-pointer text-left p-4 border-2 rounded-lg transition-all duration-200 flex items-center justify-between focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
                   :class="{
                     'bg-blue-100 border-blue-500 shadow-md':
                       answers[currentQuestion.id]?.text === option.text,
-                    'hover:bg-gray-100 hover:border-gray-400 border-gray-300':
+                    'hover:bg-gray-500 hover:border-gray-400 border-gray-300':
                       answers[currentQuestion.id]?.text !== option.text,
                   }"
                 >
-                  <span class="flex-1 mr-4">{{ option.text }}</span>
+                  <span
+                    class="flex-1 mr-4"
+                    :class="{
+                      'text-gray-700': answers[currentQuestion.id]?.text === option.text,
+                      'text-gray-700 dark:text-gray-300':
+                        answers[currentQuestion.id]?.text !== option.text,
+                    }"
+                    >{{ option.text }}</span
+                  >
                   <div class="relative group flex-shrink-0">
                     <button
                       type="button"
@@ -772,7 +794,11 @@ function handleKeyboardShortcuts(event) {
                       :aria-label="`Show explanation for option ${index + 1}`"
                     >
                       <svg
-                        class="w-6 h-6 text-gray-400 group-hover:text-blue-600 transition-colors"
+                        class="w-6 h-6 cursor-pointer group-hover:text-blue-600 transition-colors"
+                        :class="{
+                          'text-gray-500': answers[currentQuestion.id]?.text === option.text,
+                          'text-gray-300': answers[currentQuestion.id]?.text !== option.text,
+                        }"
                         fill="none"
                         stroke="currentColor"
                         viewBox="0 0 24 24"

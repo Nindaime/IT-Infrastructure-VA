@@ -13,6 +13,7 @@ const showToast = inject('showToast')
 // Form state
 const identifier = ref('')
 const password = ref('')
+const mfaCode = ref('')
 
 // Component state
 const isSubmitting = ref(false)
@@ -62,6 +63,7 @@ const submitIdentifier = async () => {
     } else if (signInAttempt.status === 'needs_first_factor') {
       // Manually advance to the password step to ensure UI updates.
       step.value = 'password'
+      isSubmitting.value = false
     }
   } catch (err) {
     const clerkError = err as ClerkAPIResponseError
@@ -69,7 +71,6 @@ const submitIdentifier = async () => {
     errorMessage.value =
       clerkError.errors?.[0]?.longMessage ||
       'The email or username you entered is incorrect. Please try again.'
-  } finally {
     isSubmitting.value = false
   }
 }
@@ -89,8 +90,7 @@ const submitPassword = async () => {
     if (result.status === 'complete') {
       await onSignInComplete(result)
     } else if (result.status === 'needs_second_factor') {
-      // Handle MFA if necessary
-      showToast('MFA is not yet implemented.', 'info')
+      step.value = 'mfa'
       isSubmitting.value = false
     }
   } catch (err) {
@@ -103,12 +103,41 @@ const submitPassword = async () => {
   }
 }
 
+const submitMfaCode = async () => {
+  if (!isLoaded.value || !signIn.value) return
+  isSubmitting.value = true
+  errorMessage.value = ''
+
+  try {
+    const result = await signIn.value.attemptSecondFactor({
+      strategy: 'totp',
+      code: mfaCode.value,
+    })
+
+    if (result.status === 'complete') {
+      await onSignInComplete(result)
+    } else {
+      // This case is not expected for TOTP but handled for completeness
+      errorMessage.value = 'An unexpected error occurred during MFA verification.'
+    }
+  } catch (err) {
+    const clerkError = err as ClerkAPIResponseError
+    console.error('MFA error:', JSON.parse(JSON.stringify(clerkError, null, 2)))
+    errorMessage.value = clerkError.errors?.[0]?.longMessage || 'Invalid MFA code. Please try again.'
+    mfaCode.value = '' // Clear MFA code on error
+  } finally {
+    isSubmitting.value = false
+  }
+}
+
 // Main sign-in handler that delegates to the correct function based on the current step
 const handleSignIn = async () => {
   if (step.value === 'identifier') {
     await submitIdentifier()
   } else if (step.value === 'password') {
     await submitPassword()
+  } else if (step.value === 'mfa') {
+    await submitMfaCode()
   }
 }
 
@@ -139,6 +168,7 @@ const goBack = async () => {
     await signIn.value.create({})
     identifier.value = ''
     password.value = ''
+    mfaCode.value = ''
     errorMessage.value = ''
     step.value = 'identifier' // Manually reset the step to ensure UI updates
   } catch (err) {
@@ -320,6 +350,27 @@ const goBack = async () => {
                   </svg>
                 </button>
               </div>
+            </div>
+          </div>
+
+          <!-- MFA Step -->
+          <div v-else-if="step === 'mfa'" key="mfa">
+            <p class="text-sm text-gray-600 mb-2">
+              Please enter the code from your authenticator app.
+            </p>
+            <div>
+              <label for="mfaCode" class="block text-sm font-medium text-gray-700 mb-1"
+                >Authentication Code</label
+              >
+              <input
+                v-model="mfaCode"
+                type="text"
+                id="mfaCode"
+                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                placeholder="e.g., 123456"
+                required
+                autocomplete="one-time-code"
+              />
             </div>
           </div>
         </transition>

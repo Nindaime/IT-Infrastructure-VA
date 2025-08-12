@@ -14,6 +14,7 @@
     "@clerk/themes": "^2.4.6",
     "@clerk/vue": "^1.9.2",
     "@ilovepdf/ilovepdf-nodejs": "^0.3.1",
+    "@rollup/rollup-linux-x64-gnu": "^4.46.2",
     "@vercel/analytics": "^1.5.0",
     "@vercel/speed-insights": "^1.2.0",
     "axios": "^1.10.0",
