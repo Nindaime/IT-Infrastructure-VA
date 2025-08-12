@@ -8,6 +8,7 @@ import { RouterLink } from 'vue-router'
 import ItivaLogo from '@/assets/itiva-logo.png'
 import CogIcon from './icons/CogIcon.vue'
 import SignOutIcon from './icons/SignOutIcon.vue'
+import DashboardIcon from './icons/DashboardIcon.vue'
 
 // Props
 defineProps({
@@ -69,7 +70,7 @@ watch(activeMenu, (val) => {
 </script>
 
 <template>
-  <header class="bg-white dark:bg-gray-900 shadow-md w-full sticky top-0 z-40">
+  <header class="text-white shadow-md w-full sticky top-0 z-40 bg-gradient-to-r from-slate-700 to-slate-800">
     <div class="container mx-auto px-4 sm:px-6 py-3">
       <nav class="flex items-center justify-between" @click.stop>
         <!-- Logo and Title -->
@@ -187,6 +188,14 @@ watch(activeMenu, (val) => {
                   </div>
                   <!-- Menu Actions -->
                   <RouterLink
+                    to="/dashboard"
+                    @click="closeMenus"
+                    class="group flex items-center w-full px-4 py-3 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer"
+                  >
+                    <DashboardIcon class="w-5 h-5 mr-3 text-gray-400 group-hover:text-blue-500" />
+                    <span>Dashboard</span>
+                  </RouterLink>
+                  <RouterLink
                     to="/account-settings"
                     @click="closeMenus"
                     class="group flex items-center w-full px-4 py-3 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer"
@@ -213,6 +222,7 @@ watch(activeMenu, (val) => {
                     </svg>
                     <span>Verify Account</span>
                   </RouterLink>
+                  <div class="border-t border-gray-200 dark:border-gray-700 my-1"></div>
                   <button
                     @click="handleLogout"
                     class="group w-full flex items-center px-4 py-3 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer"

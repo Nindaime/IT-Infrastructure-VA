@@ -18,6 +18,16 @@ function toPascalCaseUsername(u) {
     .join('')
 }
 
+function formatDateTime(dateString) {
+  const date = new Date(dateString);
+  const day = String(date.getDate()).padStart(2, '0');
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const year = date.getFullYear();
+  const hours = String(date.getHours()).padStart(2, '0');
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+  return `${day}/${month}/${year}, ${hours}:${minutes}`;
+}
+
 const router = useRouter()
 const mainContent = ref(null)
 const authStore = useAuthStore()
@@ -174,7 +184,7 @@ onBeforeUnmount(() => {
                   <th
                     class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase"
                   >
-                    Date & Time
+                    Time
                   </th>
                   <th
                     class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase"
