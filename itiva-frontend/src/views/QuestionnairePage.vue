@@ -624,7 +624,7 @@ function handleKeyboardShortcuts(event) {
           <h1 class="text-xl sm:text-2xl md:text-3xl font-bold text-gray-800 break-words">
             {{ pageTitle }}
           </h1>
-          <p class="text-gray-500 dark:text-gray-400 mt-2">
+          <p class="text-gray-900 dark:text-white mt-2">
             Question {{ currentQuestionIndex + 1 }} of {{ totalQuestions }}
           </p>
           <!-- Draft indicator -->
@@ -648,7 +648,7 @@ function handleKeyboardShortcuts(event) {
           <div class="mt-2">
             <div
               v-if="showKeyboardHelp"
-              class="hidden md:block mt-2 p-3 bg-gray-50 rounded-lg text-xs text-gray-600"
+              class="hidden md:block mt-2 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg text-xs text-gray-600 dark:text-gray-300"
             >
               <p class="font-medium mb-1">Keyboard shortcuts:</p>
               <ul class="space-y-1">
@@ -706,7 +706,7 @@ function handleKeyboardShortcuts(event) {
           <transition name="fade" mode="out-in">
             <div :key="currentQuestion.id" v-if="currentQuestion">
               <div class="flex items-start justify-between gap-4 mb-6">
-                <h2 class="text-xl md:text-2xl font-semibold text-gray-700 leading-tight">
+                <h2 class="text-xl md:text-2xl font-semibold text-gray-700 dark:text-white leading-tight">
                   {{ currentQuestion.text }}
                 </h2>
                 <div class="relative group flex-shrink-0">
@@ -754,7 +754,7 @@ function handleKeyboardShortcuts(event) {
                   role="radio"
                   :aria-checked="answers[currentQuestion.id]?.text === option.text"
                   tabindex="0"
-                  class="w-full cursor-pointer text-left p-4 border-2 rounded-lg text-gray-700 transition-all duration-200 flex items-center justify-between focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                  class="w-full cursor-pointer text-left p-4 border-2 rounded-lg text-gray-700 dark:text-white hover:text-gray-900 dark:hover:text-gray-900 transition-all duration-200 flex items-center justify-between focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
                   :class="{
                     'bg-blue-100 border-blue-500 shadow-md':
                       answers[currentQuestion.id]?.text === option.text,

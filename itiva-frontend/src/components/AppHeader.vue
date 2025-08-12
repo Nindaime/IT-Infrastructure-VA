@@ -69,7 +69,7 @@ watch(activeMenu, (val) => {
 </script>
 
 <template>
-  <header class="bg-white dark:bg-gray-900 shadow-md w-full sticky top-0 z-40">
+  <header class="text-white shadow-md w-full sticky top-0 z-40 bg-gradient-to-r from-slate-700 to-slate-800">
     <div class="container mx-auto px-4 sm:px-6 py-3">
       <nav class="flex items-center justify-between" @click.stop>
         <!-- Logo and Title -->
