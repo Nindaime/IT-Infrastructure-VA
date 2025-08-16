@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, onBeforeUnmount, computed, nextTick } from 'vue'
+import { ref, onMounted, onBeforeUnmount, computed, nextTick, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import jsPDF from 'jspdf'
 import { applyPlugin } from 'jspdf-autotable'
@@ -51,10 +51,9 @@ const viewedUser = computed(() => {
 
 const companyNameToDisplay = computed(() => {
   if (isAdminView.value && viewedUser.value) {
-    return viewedUser.value.companyName || 'User Business'
+    return viewedUser.value.publicMetadata?.companyName || 'User Business'
   }
-  // For regular user view, get the currently logged-in user's company name
-  return authStore.currentUser?.companyName || 'Your Business'
+  return authStore.companyName || 'Your Business'
 })
 
 // --- End Admin View Logic ---
@@ -592,55 +591,75 @@ async function downloadReportAsPDF() {
 
 // --- Lifecycle ---
 onMounted(() => {
-  const reportId = route.params.reportId
-  let fullReportObject = null
+  let stopWatch = null
+  stopWatch = watch(
+    () => authStore.isClerkLoaded,
+    (isLoaded) => {
+      if (isLoaded) {
+        const reportId = route.params.reportId
+        let fullReportObject = null
 
-  // In admin view, the report data is passed via router state to bypass security checks.
-  if (isAdminView.value && window.history.state.reportData) {
-    fullReportObject = window.history.state.reportData
-  } else {
-    // For regular users, fetch the report from the store, which includes a security check.
-    fullReportObject = reportsStore.getReportById(reportId)
-  }
+        // In admin view, the report data is passed via router state to bypass security checks.
+        if (isAdminView.value && window.history.state.reportData) {
+          fullReportObject = window.history.state.reportData
+        } else {
+          // For regular users, fetch the report from the store, which includes a security check.
+          fullReportObject = reportsStore.getReportById(reportId)
+        }
 
-  // Check if a valid report was found either from state or store.
-  if (fullReportObject && fullReportObject.report) {
-    const reportContent = fullReportObject.report
-    reportData.value = {
-      name: fullReportObject.name,
-      type: fullReportObject.type,
-      // The scores object now contains the overall score and the dynamic category array
-      scores: {
-        overall: reportContent.overall,
-        // Ensure categories is an array to prevent render errors.
-        // The key is `categoryScores` in the report object.
-        categories: reportContent.categoryScores || [],
-      },
-      // Use the generated recommendations directly
-      // FIX: Ensure recommendations is always an array to prevent render errors.
-      recommendations: reportContent.recommendations || [],
-    }
-  } else {
-    console.error(`Report with ID "${reportId}" not found. Displaying default data.`)
-    // Fallback to default data if no report is in the store
-    reportData.value = {
-      name: defaultReport.name,
-      type: 'Default Assessment',
-      scores: defaultReport.scores,
-      // Ensure recommendations is always an array
-      recommendations:
-        defaultReport.prioritizedRecs?.map((r) => ({
-          text: r.rec,
-          category: r.category,
-          impactScore: parseInt(r.impact),
-        })) || [],
-    }
-  }
+        // Check if a valid report was found either from state or store.
+        if (fullReportObject && fullReportObject.report) {
+          const reportContent = fullReportObject.report
+          reportData.value = {
+            name: fullReportObject.name,
+            type: fullReportObject.type,
+            // The scores object now contains the overall score and the dynamic category array
+            scores: {
+              overall: reportContent.overall,
+              // Ensure categories is an array to prevent render errors.
+              // The key is `categoryScores` in the report object.
+              categories: reportContent.categoryScores || [],
+            },
+            // Use the generated recommendations directly
+            // FIX: Ensure recommendations is always an array to prevent render errors.
+            recommendations: reportContent.recommendations || [],
+          }
+        } else {
+          console.error(`Report with ID "${reportId}" not found. Displaying default data.`)
+          // Fallback to default data if no report is in the store
+          reportData.value = {
+            name: defaultReport.name,
+            type: 'Default Assessment',
+            scores: defaultReport.scores,
+            // Ensure recommendations is always an array
+            recommendations:
+              defaultReport.prioritizedRecs?.map((r) => ({
+                text: r.rec,
+                category: r.category,
+                impactScore: parseInt(r.impact),
+              })) || [],
+          }
+        }
 
-  nextTick(() => {
-    if (reportData.value) {
-      generateSummary(reportData.value)
-      createOrUpdateChart(reportData.value)
+        nextTick(() => {
+          if (reportData.value) {
+            generateSummary(reportData.value)
+            createOrUpdateChart(reportData.value)
+          }
+        })
+
+        // Stop watching once loaded
+        if (stopWatch) {
+          stopWatch()
+        }
+      }
+    },
+    { immediate: true },
+  )
+
+  onBeforeUnmount(() => {
+    if (stopWatch) {
+      stopWatch()
     }
   })
 })
@@ -816,9 +835,7 @@ onMounted(() => {
               <span class="font-bold text-white">{{ reportData.name }} Report</span> on
               {{ generatedDate }} by ITIVA
             </p>
-            <p class="text-xl text-gray-300">
-              For: {{ companyNameToDisplay }}
-            </p>
+            <p class="text-xl text-gray-300">For: {{ companyNameToDisplay }}</p>
           </header>
           <main class="p-12">
             <section class="mb-8 pb-8 border-b">

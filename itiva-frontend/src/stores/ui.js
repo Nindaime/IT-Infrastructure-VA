@@ -12,18 +12,8 @@ export const useUiStore = defineStore('ui', () => {
 
   function toggleTheme() {
     theme.value = theme.value === 'light' ? 'dark' : 'light'
-  }
-
-  // Apply Tailwind dark mode by toggling only the 'dark' class on <html>
-  watchEffect(() => {
-    const root = window.document.documentElement
-    if (theme.value === 'dark') {
-      root.classList.add('dark')
-    } else {
-      root.classList.remove('dark')
-    }
     safeStorage.setItem('app-theme', theme.value)
-  })
+  }
 
   // --- Scroll Container Management ---
   const mainScrollContainer = ref(null)

@@ -1,27 +1,34 @@
 <!-- src/views/admin/AdminDashboardPage.vue - Updated as per requirements -->
 <script setup>
-import { ref, computed } from 'vue'
-import { useRouter, RouterLink } from 'vue-router' // Import RouterLink for navigation
-import { mockRankings, fullQuestionnaireData } from '@/api/mockData' // Using mock data
+import { ref, computed, onMounted, watch } from 'vue'
+import { useRouter, RouterLink } from 'vue-router'
+import { useAuthStore } from '@/stores/auth'
+import { useQuestionnairesStore } from '@/stores/questionnaires'
+import { mockRankings } from '@/api/mockData'
 
-// Initialize the router for navigation
 const router = useRouter()
+const authStore = useAuthStore()
+const questionnairesStore = useQuestionnairesStore()
 
-// Reactive state for showing/hiding the welcome modal (now uses the flash-out-fade transition)
-const showWelcomeModal = ref(true)
+// --- Welcome Modal State & Logic ---
+const showWelcomeModal = ref(false)
+onMounted(() => {
+  if (localStorage.getItem('adminWelcomeModalShown') !== 'true') {
+    showWelcomeModal.value = true
+  }
+})
+watch(showWelcomeModal, (isShowing) => {
+  if (!isShowing) {
+    localStorage.setItem('adminWelcomeModalShown', 'true')
+  }
+})
 
-// Mock data for admin dashboard overview
-const totalUsers = ref(150)
-const activeAssessments = ref(25)
-const pendingApprovals = ref(5)
-
-// Mock list of all businesses/clients (could be fetched from backend)
+// --- Dashboard Panel Data ---
 const businesses = ref(
   mockRankings.map((r) => ({
     ...r,
-    id: r.rank, // Ensure unique ID for iteration
+    id: r.rank,
     status: r.score > 70 ? 'Active' : 'Needs Attention',
-    // Add category scores directly from report for progress bars
     categoryScores: r.report
       ? [
           { name: 'Website Strength', score: r.report.ws, key: 'ws' },
@@ -32,45 +39,72 @@ const businesses = ref(
       : [],
   })),
 )
+const totalUsers = computed(() => businesses.value.length)
+const activeAssessments = computed(
+  () => questionnairesStore.questionnaires.filter((q) => q.status === 'Active').length,
+)
+const pendingApprovals = ref(5) // Static value as backend is not available
 
-// Reactive state for selected business to show category scores on the right side
+// --- Questionnaire Management State & Logic ---
+const questionnaires = computed(() => {
+  return questionnairesStore.questionnaires.map((q) => ({
+    ...q,
+    questionsCount: questionnairesStore.getQuestionCountForAssessment(q.name) || 'N/A',
+  }))
+})
+
+const showDeleteModal = ref(false)
+const showDuplicateModal = ref(false)
+const questionnaireToAction = ref(null)
+
+function openDeleteModal(questionnaire) {
+  questionnaireToAction.value = questionnaire
+  showDeleteModal.value = true
+}
+
+function confirmDelete() {
+  if (questionnaireToAction.value) {
+    questionnairesStore.deleteQuestionnaire(questionnaireToAction.value.id)
+  }
+  closeModals()
+}
+
+function openDuplicateModal(questionnaire) {
+  questionnaireToAction.value = questionnaire
+  showDuplicateModal.value = true
+}
+
+function confirmDuplicate() {
+  if (questionnaireToAction.value) {
+    questionnairesStore.duplicateQuestionnaire(questionnaireToAction.value.id)
+  }
+  closeModals()
+}
+
+function closeModals() {
+  showDeleteModal.value = false
+  showDuplicateModal.value = false
+  questionnaireToAction.value = null
+}
+
+function formatDate(dateString) {
+  if (!dateString) return 'N/A'
+  const date = new Date(dateString)
+  return date.toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  })
+}
+
+// --- Business Management State & Logic (existing) ---
 const selectedBusinessForScores = ref(businesses.value.length > 0 ? businesses.value[0] : null)
-
-// Mock list of questionnaires (editable by admin)
-const questionnaires = ref([
-  {
-    id: 1,
-    name: 'Standard ITIVA Assessment',
-    questionsCount: fullQuestionnaireData.length,
-    lastUpdated: '2024-05-01',
-    status: 'Active',
-  },
-  {
-    id: 2,
-    name: 'Advanced Cloud Security Check',
-    questionsCount: 15,
-    lastUpdated: '2024-04-10',
-    status: 'Active',
-  },
-  {
-    id: 3,
-    name: 'GDPR Compliance Audit',
-    questionsCount: 10,
-    lastUpdated: '2024-03-20',
-    status: 'Draft',
-  },
-])
-
-// Reactive state for search and sort for business list
 const searchTerm = ref('')
-const sortKey = ref('score') // Default sort key is 'score'
-const sortOrder = ref(0) // 0 for descending, 1 for ascending
+const sortKey = ref('score')
+const sortOrder = ref(0)
 
-// Computed property for filtered and sorted businesses in the list
 const filteredAndSortedBusinesses = computed(() => {
   let filtered = businesses.value
-
-  // Apply search filter
   if (searchTerm.value) {
     const lowerCaseSearchTerm = searchTerm.value.toLowerCase()
     filtered = filtered.filter(
@@ -80,8 +114,6 @@ const filteredAndSortedBusinesses = computed(() => {
         biz.type.toLowerCase().includes(lowerCaseSearchTerm),
     )
   }
-
-  // Apply sorting
   return filtered.sort((a, b) => {
     let valA = a[sortKey.value]
     let valB = b[sortKey.value]
@@ -92,50 +124,29 @@ const filteredAndSortedBusinesses = computed(() => {
   })
 })
 
-/**
- * Toggles the sort order when a sort key is clicked.
- * @param {string} key The key to sort by.
- */
 function toggleSort(key) {
   if (sortKey.value === key) {
-    sortOrder.value = sortOrder.value === 0 ? 1 : 0 // Toggle between 0 and 1
+    sortOrder.value = sortOrder.value === 0 ? 1 : 0
   } else {
     sortKey.value = key
-    sortOrder.value = 0 // Default to descending for new key
+    sortOrder.value = 0
   }
 }
 
-/**
- * Sets the selected business for displaying category scores.
- * @param {object} biz The business object to select.
- */
 function selectBusinessForScores(biz) {
   selectedBusinessForScores.value = biz
 }
 
-/**
- * Navigates to the edit questionnaire page for a specific questionnaire.
- * @param {object} questionnaire The questionnaire object to be edited.
- */
 function editQuestionnaire(questionnaire) {
   router.push({ name: 'adminQuestionnaire', params: { questionnaireId: questionnaire.id } })
 }
 
-/**
- * Handles adding a new questionnaire.
- */
 function addNewQuestionnaire() {
   router.push({ name: 'adminQuestionnaire', params: { questionnaireId: 'new' } })
 }
 
-/**
- * Logs out the admin and navigates to the home page.
- */
-function logout() {
-  console.log('Admin logged out')
-  // If you add an emit in App.vue for logout, uncomment the line below.
-  // emit('logout');
-  router.push('/') // Redirect to home page after logout
+async function logout() {
+  await authStore.logout()
 }
 </script>
 
@@ -156,13 +167,13 @@ function logout() {
       <nav class="flex items-center space-x-4">
         <button
           @click="addNewQuestionnaire"
-          class="px-4 py-2 rounded-md text-sm font-medium bg-green-600 text-white hover:bg-green-700 transition-colors duration-200"
+          class="px-4 py-2 rounded-md cursor-pointer text-sm font-medium bg-green-600 text-white hover:bg-green-700 transition-colors duration-200"
         >
           Add New Questionnaire
         </button>
         <button
           @click="logout"
-          class="px-4 py-2 rounded-md text-sm font-medium border border-gray-300 text-gray-700 hover:bg-gray-100 transition-colors duration-200"
+          class="px-4 py-2 rounded-md cursor-pointer text-sm font-medium border border-gray-300 text-gray-700 hover:bg-gray-100 transition-colors duration-200"
         >
           Logout
         </button>
@@ -207,7 +218,7 @@ function logout() {
             <button
               @click="toggleSort('score')"
               :class="[
-                'px-3 py-1 text-sm rounded-full',
+                'px-3 py-1 text-sm rounded-full cursor-pointer',
                 sortKey === 'score' ? 'bg-blue-600 text-white' : 'bg-gray-200',
               ]"
             >
@@ -217,7 +228,7 @@ function logout() {
             <button
               @click="toggleSort('name')"
               :class="[
-                'px-3 py-1 text-sm rounded-full',
+                'px-3 py-1 text-sm rounded-full cursor-pointer',
                 sortKey === 'name' ? 'bg-blue-600 text-white' : 'bg-gray-200',
               ]"
             >
@@ -227,7 +238,7 @@ function logout() {
             <button
               @click="toggleSort('location')"
               :class="[
-                'px-3 py-1 text-sm rounded-full',
+                'px-3 py-1 text-sm rounded-full cursor-pointer',
                 sortKey === 'location' ? 'bg-blue-600 text-white' : 'bg-gray-200',
               ]"
             >
@@ -237,7 +248,7 @@ function logout() {
             <button
               @click="toggleSort('type')"
               :class="[
-                'px-3 py-1 text-sm rounded-full',
+                'px-3 py-1 text-sm rounded-full cursor-pointer',
                 sortKey === 'type' ? 'bg-blue-600 text-white' : 'bg-gray-200',
               ]"
             >
@@ -281,8 +292,8 @@ function logout() {
                       biz.score > 75
                         ? 'text-green-600'
                         : biz.score > 50
-                          ? 'text-yellow-600'
-                          : 'text-red-600'
+                        ? 'text-yellow-600'
+                        : 'text-red-600'
                     "
                   >
                     {{ biz.score }}
@@ -356,7 +367,7 @@ function logout() {
         <div class="mb-4">
           <button
             @click="addNewQuestionnaire"
-            class="px-5 py-2 bg-blue-600 text-white rounded-md font-semibold hover:bg-blue-700 transition-colors duration-200"
+            class="px-5 py-2 bg-blue-600 text-white rounded-md font-semibold hover:bg-blue-700 transition-colors duration-200 cursor-pointer"
           >
             Create New Questionnaire
           </button>
@@ -389,9 +400,7 @@ function logout() {
                 >
                   Status
                 </th>
-                <th scope="col" class="relative px-6 py-3">
-                  <span class="sr-only">Edit</span>
-                </th>
+                <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
             <tbody class="bg-white divide-y divide-gray-200">
@@ -403,7 +412,7 @@ function logout() {
                   {{ q.questionsCount }}
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                  {{ q.lastUpdated }}
+                  {{ formatDate(q.lastUpdated) }}
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap">
                   <span
@@ -418,12 +427,9 @@ function logout() {
                   </span>
                 </td>
                 <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                  <button
-                    @click="editQuestionnaire(q)"
-                    class="text-indigo-600 hover:text-indigo-900 transition-colors duration-200"
-                  >
-                    Edit
-                  </button>
+                  <button @click="editQuestionnaire(q)" class="text-indigo-600 hover:text-indigo-900 cursor-pointer">Edit</button>
+                  <button @click="openDuplicateModal(q)" class="text-blue-600 hover:text-blue-900 ml-4 cursor-pointer">Duplicate</button>
+                  <button @click="openDeleteModal(q)" class="text-red-600 hover:text-red-900 ml-4 cursor-pointer">Delete</button>
                 </td>
               </tr>
             </tbody>
@@ -431,6 +437,37 @@ function logout() {
         </div>
       </section>
     </main>
+
+    <!-- Modals -->
+    <transition name="fade">
+      <div v-if="showDeleteModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+        <div class="bg-white rounded-lg shadow-xl p-6 max-w-sm w-full">
+          <h3 class="text-lg font-medium text-gray-900">Delete Questionnaire</h3>
+          <p class="mt-2 text-sm text-gray-600">
+            Are you sure you want to delete "<strong>{{ questionnaireToAction.name }}</strong>"? This will also delete all of its questions. This action cannot be undone.
+          </p>
+          <div class="mt-4 flex justify-end space-x-2">
+            <button @click="closeModals" class="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 cursor-pointer">Cancel</button>
+            <button @click="confirmDelete" class="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 cursor-pointer">Delete</button>
+          </div>
+        </div>
+      </div>
+    </transition>
+
+    <transition name="fade">
+      <div v-if="showDuplicateModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+        <div class="bg-white rounded-lg shadow-xl p-6 max-w-sm w-full">
+          <h3 class="text-lg font-medium text-gray-900">Duplicate Questionnaire</h3>
+          <p class="mt-2 text-sm text-gray-600">
+            Are you sure you want to duplicate "<strong>{{ questionnaireToAction.name }}</strong>"? A new draft copy will be created.
+          </p>
+          <div class="mt-4 flex justify-end space-x-2">
+            <button @click="closeModals" class="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 cursor-pointer">Cancel</button>
+            <button @click="confirmDuplicate" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 cursor-pointer">Duplicate</button>
+          </div>
+        </div>
+      </div>
+    </transition>
 
     <!-- Welcome Modal: Displays a welcome message when the dashboard is loaded -->
     <!-- Using flash-out-fade transition for the modal overlay and content -->
@@ -445,7 +482,7 @@ function logout() {
           <!-- Close button for the modal -->
           <button
             @click="showWelcomeModal = false"
-            class="absolute top-4 right-4 text-gray-400 hover:text-gray-600"
+            class="absolute top-4 right-4 text-gray-400 hover:text-gray-600 cursor-pointer"
           >
             <!-- Close Icon -->
             <svg
@@ -472,7 +509,7 @@ function logout() {
           <!-- Continue Button to close the modal -->
           <button
             @click="showWelcomeModal = false"
-            class="bg-blue-600 text-white font-semibold py-2 px-6 rounded-md hover:bg-blue-700 transition-colors duration-200"
+            class="bg-blue-600 text-white font-semibold py-2 px-6 rounded-md hover:bg-blue-700 transition-colors duration-200 cursor-pointer"
           >
             Continue
           </button>

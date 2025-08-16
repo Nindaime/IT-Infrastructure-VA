@@ -52,7 +52,8 @@ export const useAuthStore = defineStore('auth', () => {
 
   const companyName = computed(() => {
     const u = currentUser.value
-    return u?.publicMetadata?.companyName || ''
+    if (!u) return ''
+    return u.publicMetadata?.companyName || u.unsafeMetadata?.companyName || ''
   })
 
   watch(
@@ -63,13 +64,14 @@ export const useAuthStore = defineStore('auth', () => {
         cachedIsAuthenticated.value = newIsSignedIn
 
         if (newIsSignedIn && newUser) {
+          // console.log('User metadata:', newUser.unsafeMetadata) // Log user metadata
           const userToCache = {
             id: newUser.id,
             firstName: newUser.firstName,
             lastName: newUser.lastName,
             username: newUser.username,
             email: newUser.primaryEmailAddress.emailAddress,
-            publicMetadata: newUser.publicMetadata,
+            publicMetadata: newUser.unsafeMetadata,
             imageUrl: newUser.imageUrl, // Cache the image URL
           }
           safeStorage.setItem('auth-user-cache', userToCache)
@@ -85,11 +87,14 @@ export const useAuthStore = defineStore('auth', () => {
 
   // --- Actions ---
   const logout = async () => {
-    // The clerk instance can be null if Clerk is not fully loaded.
-    // This check ensures we don't call signOut on null.
     if (clerk.value) {
-      await clerk.value.signOut()
-      await router.push('/')
+      try {
+        await clerk.value.signOut()
+        router.push('/login')
+      } catch (error) {
+        console.error('Error during sign out:', error)
+        throw error
+      }
     }
   }
 
@@ -104,6 +109,7 @@ export const useAuthStore = defineStore('auth', () => {
     userName,
     userEmail,
     isAdmin,
+    companyName,
 
     // Actions
     logout,

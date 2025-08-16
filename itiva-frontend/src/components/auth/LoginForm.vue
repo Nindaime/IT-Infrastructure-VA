@@ -1,14 +1,20 @@
 <!-- src/components/auth/LoginForm.vue -->
 <script setup lang="ts">
-import type { ClerkAPIResponseError, OAuthStrategy } from '@clerk/types'
+import type {
+  ClerkAPIError,
+  ClerkAPIResponseError,
+  OAuthStrategy,
+  SignInResource,
+} from '@clerk/types'
 import { ref, inject, watch } from 'vue'
-import { useSignIn, useClerk, GoogleOneTap } from '@clerk/vue'
+import { useSignIn, useClerk, GoogleOneTap, useUser } from '@clerk/vue'
 import { useRouter } from 'vue-router'
 
 const { signIn, isLoaded } = useSignIn()
+const { user } = useUser()
 const clerk = useClerk()
 const router = useRouter()
-const showToast = inject('showToast')
+const showToast = inject('showToast') as (message: string, type: 'success' | 'error') => void
 
 // Form state
 const identifier = ref('')
@@ -26,9 +32,42 @@ const step = ref('loading')
 // the UI shows the correct step.
 watch(
   isLoaded,
-  (loaded) => {
-    if (loaded) {
-      step.value = signIn.value?.status === 'needs_first_factor' ? 'password' : 'identifier'
+  async (loaded) => {
+    if (!loaded || !signIn.value) {
+      step.value = 'loading'
+      return
+    }
+
+    const { firstFactorVerification, secondFactorVerification, status } = signIn.value
+
+    // Handle OAuth callback errors
+    if (firstFactorVerification?.error) {
+      const { longMessage, code } = firstFactorVerification.error as ClerkAPIError
+      console.error('Social sign in error:', code, longMessage)
+
+      // Reset the sign-in flow to clear the error state from Clerk's side
+      await (signIn.value as SignInResource).create({})
+
+      // Specifically handle unlinked social accounts
+      if (code === 'external_account_unverified') {
+        const strategy = (firstFactorVerification.strategy || 'social').replace('oauth_', '')
+        const providerName = strategy.charAt(0).toUpperCase() + strategy.slice(1)
+        showToast(
+          `You have not linked your ${providerName} account. Please sign in with your password to link them.`,
+          'error',
+        )
+      } else {
+        errorMessage.value = longMessage || 'An unknown error occurred during social sign-in.'
+      }
+      step.value = 'identifier'
+    } else if (status === 'needs_second_factor') {
+      // This handles resuming a sign-in that requires 2FA, including after a social login
+      step.value = 'mfa'
+    } else if (status === 'needs_first_factor') {
+      // This handles resuming a password-based sign-in
+      step.value = 'password'
+    } else {
+      step.value = 'identifier'
     }
   },
   { immediate: true },
@@ -37,9 +76,20 @@ watch(
 // Handles successful sign-in completion
 const onSignInComplete = async (signInResult) => {
   try {
-    await clerk.value.setActive({ session: signInResult.createdSessionId })
+    await clerk.value.setActive({
+      session: signInResult.createdSessionId,
+      beforeEmit: (session) => {
+        // This ensures the URL is cleaned up before the user is considered fully signed in
+        if (router.currentRoute.value.path.includes('clerk_handshake')) {
+          router.replace('/dashboard')
+        }
+      },
+    })
     showToast('Sign in successful! Redirecting...', 'success')
-    await router.push('/dashboard')
+    // The beforeEmit hook handles the redirect, but we can push again as a fallback.
+    if (router.currentRoute.value.name !== 'dashboard') {
+      await router.push('/dashboard')
+    }
   } catch (e) {
     console.error('Error during session activation or redirect:', e)
     errorMessage.value = 'Login was successful, but redirect failed. Please refresh the page.'
@@ -123,7 +173,8 @@ const submitMfaCode = async () => {
   } catch (err) {
     const clerkError = err as ClerkAPIResponseError
     console.error('MFA error:', JSON.parse(JSON.stringify(clerkError, null, 2)))
-    errorMessage.value = clerkError.errors?.[0]?.longMessage || 'Invalid MFA code. Please try again.'
+    errorMessage.value =
+      clerkError.errors?.[0]?.longMessage || 'Invalid MFA code. Please try again.'
     mfaCode.value = '' // Clear MFA code on error
   } finally {
     isSubmitting.value = false
@@ -144,12 +195,27 @@ const handleSignIn = async () => {
 // Handles sign-in with social providers like Google or Facebook
 const signInWithSocial = async (strategy: OAuthStrategy) => {
   if (!isLoaded.value || !signIn.value) return
+
+  const providerName = strategy.replace('oauth_', '')
+  const providerTitle = providerName.charAt(0).toUpperCase() + providerName.slice(1)
+
+  // 1. Check if the user has this social account enabled
+  const isEnabled = user.value?.externalAccounts.some(
+    (account) => account.provider === providerName,
+  )
+
+  if (user.value && !isEnabled) {
+    showToast(`Please enable ${providerTitle} login in your account settings first.`, 'error')
+    return
+  }
+
   isSubmitting.value = true
   try {
+    // 2. Clean up URL by redirecting to a clean path after handshake
     await signIn.value.authenticateWithRedirect({
       strategy,
-      redirectUrl: '/link-accounts',
-      redirectUrlComplete: '/dashboard',
+      redirectUrl: '/login',
+      redirectUrlComplete: '/dashboard?handshake=true', // Use a query param to signal completion
     })
   } catch (err) {
     const clerkError = err as ClerkAPIResponseError
@@ -164,7 +230,7 @@ const goBack = async () => {
   if (!isLoaded.value || !signIn.value) return
   isSubmitting.value = true // Prevent user interaction during reset
   try {
-    // This creates a new sign-in attempt, effectively resetting the state.
+    // This creates a new sign-in attempt, effectively resetting the state
     await signIn.value.create({})
     identifier.value = ''
     password.value = ''

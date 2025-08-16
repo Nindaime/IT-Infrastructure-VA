@@ -2,6 +2,7 @@
 <script setup>
 import { ref, computed, onMounted, onBeforeUnmount, inject } from 'vue'
 import { useRouter } from 'vue-router'
+import { storeToRefs } from 'pinia'
 import { useAssessmentStore } from '@/stores/assessment'
 import { useAuthStore } from '@/stores/auth'
 import { useReportsStore } from '@/stores/reports'
@@ -19,23 +20,26 @@ function toPascalCaseUsername(u) {
 }
 
 function formatDateTime(dateString) {
-  const date = new Date(dateString);
-  const day = String(date.getDate()).padStart(2, '0');
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const year = date.getFullYear();
-  const hours = String(date.getHours()).padStart(2, '0');
-  const minutes = String(date.getMinutes()).padStart(2, '0');
-  return `${day}/${month}/${year}, ${hours}:${minutes}`;
+  const date = new Date(dateString)
+  const day = String(date.getDate()).padStart(2, '0')
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const year = date.getFullYear()
+  const hours = String(date.getHours()).padStart(2, '0')
+  const minutes = String(date.getMinutes()).padStart(2, '0')
+  return `${day}/${month}/${year}, ${hours}:${minutes}`
 }
 
 const router = useRouter()
 const mainContent = ref(null)
 const authStore = useAuthStore()
+const { isAdmin } = storeToRefs(authStore)
 const reportsStore = useReportsStore()
 const uiStore = useUiStore()
 const questionnairesStore = useQuestionnairesStore()
 const assessmentStore = useAssessmentStore()
 const showToast = inject('showToast')
+
+const isAdminView = computed(() => isAdmin.value)
 
 const showDeleteConfirmModal = ref(false)
 const reportToDeleteId = ref(null)
@@ -61,7 +65,17 @@ const filteredReports = computed(() => {
 })
 
 const activeAssessments = computed(() =>
-  questionnairesStore.questionnaires.filter((q) => q.status === 'Active'),
+  questionnairesStore.questionnaires
+    .filter((q) => q.status === 'Active')
+    .map((assessment) => {
+      const questionCount = questionnairesStore.allQuestions.filter(
+        (question) => question.assessment_name === assessment.name,
+      ).length
+      return {
+        ...assessment,
+        questionCount,
+      }
+    }),
 )
 
 function viewReport(report) {
@@ -108,8 +122,8 @@ async function startSelectedAssessment(type) {
 }
 
 async function logout() {
-  await authStore.logout()
   showToast('You have been logged out.', 'info')
+     authStore.logout()
 }
 
 onMounted(() => {
@@ -292,8 +306,13 @@ onBeforeUnmount(() => {
               </tbody>
             </table>
           </div>
-          <div v-else class="text-center py-8 text-gray-500 dark:text-gray-400">
-            <p>No reports found.</p>
+          <div v-else class="text-center flex items-center justify-center h-80">
+            <button
+              @click="showNewAssessmentModal = true"
+              class="bg-blue-600 text-white font-bold py-3 px-6 rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              Start New Assessment
+            </button>
           </div>
         </section>
 
@@ -348,9 +367,14 @@ onBeforeUnmount(() => {
                 @click="startSelectedAssessment(assessment.name)"
                 class="w-full text-left p-4 rounded-lg bg-gray-100 dark:bg-gray-700 hover:bg-blue-100 dark:hover:bg-blue-900 cursor-pointer"
               >
-                <h4 class="font-semibold text-gray-800 dark:text-gray-200">
-                  {{ assessment.name }}
-                </h4>
+                <div class="flex justify-between items-center">
+                  <h4 class="font-semibold text-gray-800 dark:text-gray-200">
+                    {{ assessment.name }}
+                  </h4>
+                  <span class="text-sm font-medium text-gray-500 dark:text-gray-400">
+                    {{ assessment.questionCount }} questions
+                  </span>
+                </div>
               </button>
             </li>
           </ul>

@@ -18,9 +18,10 @@ if (!clerkPubKey) {
 app.use(createPinia())
 app.use(clerkPlugin, {
   publishableKey: clerkPubKey,
-  // The following are automatically handled by the new router setup
-  // routerPush: (to) => router.push(to),
-  // routerReplace: (to) => router.replace(to),
+  routerPush: (to) => router.push(to),
+  routerReplace: (to) => router.replace(to),
+  forceRedirectUrl: '/dashboard',
+  // afterSignUpUrl: '/dashboard',
 })
 app.use(router)
 

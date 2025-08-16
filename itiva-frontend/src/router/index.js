@@ -109,7 +109,19 @@ router.beforeEach(async (to, from, next) => {
     })
   }
 
-  const userRole = user.value?.publicMetadata?.role
+  // Wait for user data to be available, especially after login
+  if (isSignedIn.value && !user.value) {
+    await new Promise((resolve) => {
+      const unwatch = watch(user, (newValue) => {
+        if (newValue) {
+          unwatch()
+          resolve()
+        }
+      })
+    })
+  }
+
+  const userRole = user.value?.unsafeMetadata?.role
 
   // Redirect authenticated admins to admin dashboard when they hit user-land entry points
   const userEntryRoutes = ['home', 'login', 'sign-up', 'dashboard']

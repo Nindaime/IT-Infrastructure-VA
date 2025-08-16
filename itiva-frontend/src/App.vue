@@ -1,8 +1,9 @@
 <!-- src/App.vue - Updated to manage global header/footer visibility and notification -->
 <script setup>
-import { computed, ref, provide, onMounted } from 'vue'
+import { computed, ref, provide, onMounted, watchEffect } from 'vue'
 import { useRoute, RouterView, useRouter } from 'vue-router'
 import { useReportsStore } from './stores/reports'
+import { useUiStore } from './stores/ui'
 import { SpeedInsights } from '@vercel/speed-insights/vue'
 import { Analytics } from '@vercel/analytics/vue'
 import AppHeader from './components/AppHeader.vue'
@@ -12,6 +13,7 @@ import ToastNotification from '@/components/ToastNotification.vue'
 const route = useRoute()
 const router = useRouter()
 const reportsStore = useReportsStore()
+const uiStore = useUiStore()
 
 // Reactive state for global notifications
 const toast = ref({
@@ -34,6 +36,16 @@ onMounted(() => {
   router.isReady().then(() => {
     reportsStore.loadReportsFromStorage()
   })
+})
+
+// Apply Tailwind dark mode by toggling only the 'dark' class on <html>
+watchEffect(() => {
+  const root = window.document.documentElement
+  if (uiStore.theme === 'dark') {
+    root.classList.add('dark')
+  } else {
+    root.classList.remove('dark')
+  }
 })
 
 const showGlobalHeaderAndFooter = computed(() => route.meta.showHeaderAndFooter !== false)

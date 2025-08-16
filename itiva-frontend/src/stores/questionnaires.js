@@ -891,7 +891,7 @@ const initialMockAllQuestions = [
           'Critical: Research and create an Incident Response Plan. It is a simple document outlining who to call and what steps to take when a breach occurs.',
       },
       {
-        text: 'No, we have no plan for security incidents.',
+        text: 'No, we have no plan for a security incident.',
         score: -2,
         explanation:
           'A critical failure. The damage from a breach will be significantly worse without a plan.',
@@ -2678,31 +2678,39 @@ const initialMockAllQuestions = [
   },
 ]
 
-export const useQuestionnairesStore = defineStore('questionnaires', () => {
-  // --- STATE ---
-  // Load initial state from localStorage or fall back to mock data
-  const questionnaires = ref(
-    JSON.parse(localStorage.getItem('questionnaires__questionnaires')) || initialMockQuestionnaires,
-  )
-  const allQuestions = ref(
-    JSON.parse(localStorage.getItem('questionnaires__allQuestions')) || initialMockAllQuestions,
-  )
+const getInitialState = (key, fallback) => {
+  const storedValue = localStorage.getItem(key)
+  if (!storedValue) {
+    return fallback
+  }
+  try {
+    return JSON.parse(storedValue)
+  } catch (e) {
+    console.error(`Failed to parse ${key} from localStorage:`, e)
+    return fallback
+  }
+}
 
-  // --- WATCHER FOR PERSISTENCE ---
-  // This is the core of the solution. It automatically saves the state to
-  // localStorage whenever the questionnaires or questions arrays change.
+export const useQuestionnairesStore = defineStore('questionnaires', () => {
+  const questionnaires = ref(
+    getInitialState('questionnaires__questionnaires', initialMockQuestionnaires),
+  )
+  const allQuestions = ref(getInitialState('questionnaires__allQuestions', initialMockAllQuestions))
+
   watch(
     [questionnaires, allQuestions],
     () => {
-      localStorage.setItem('questionnaires__questionnaires', JSON.stringify(questionnaires.value))
-      localStorage.setItem('questionnaires__allQuestions', JSON.stringify(allQuestions.value))
+      try {
+        localStorage.setItem('questionnaires__questionnaires', JSON.stringify(questionnaires.value))
+        localStorage.setItem('questionnaires__allQuestions', JSON.stringify(allQuestions.value))
+      } catch (e) {
+        console.error('Failed to save questionnaires to localStorage:', e)
+      }
     },
     { deep: true },
   )
 
-  // --- Getters (as plain functions) ---
   const getQuestionnaireById = (id) => {
-    // The ID from the route is a string, so we need to convert it.
     const numericId = parseInt(id, 10)
     return questionnaires.value.find((q) => q.id === numericId)
   }
@@ -2715,40 +2723,32 @@ export const useQuestionnairesStore = defineStore('questionnaires', () => {
     return getQuestionsForAssessment(assessmentName).length
   }
 
-  // --- ACTIONS ---
   const updateQuestionnaire = (updatedQuestionnaire) => {
     const questionnaireInStore = questionnaires.value.find((q) => q.id === updatedQuestionnaire.id)
     if (!questionnaireInStore) {
       return { success: false, message: 'Questionnaire not found' }
     }
 
-    // Get the original name before the update, in case it was changed.
     const originalName = questionnaireInStore.name
     const newName = updatedQuestionnaire.name
 
-    // Separate metadata from the questions payload
     const { questions: updatedQuestions, ...metaData } = updatedQuestionnaire
 
-    // Update the questionnaire metadata (name, status, etc.)
     questionnaireInStore.name = metaData.name
     questionnaireInStore.status = metaData.status
     questionnaireInStore.lastUpdated = new Date().toISOString()
 
-    // Remove all questions associated with the *original* name.
-    // This handles deletions and prepares for updates/additions.
     allQuestions.value = allQuestions.value.filter((q) => q.assessment_name !== originalName)
 
-    // Add the updated list of questions back, ensuring they have the new name.
     if (updatedQuestions && updatedQuestions.length > 0) {
       const questionsToAdd = updatedQuestions.map((q) => ({
         ...q,
         assessment_name: newName,
-        uuid: undefined, // Do not persist temporary UI key
+        uuid: undefined,
       }))
       allQuestions.value.push(...questionsToAdd)
     }
 
-    console.log('Updated questionnaire and questions successfully.')
     return { success: true }
   }
 
@@ -2758,34 +2758,28 @@ export const useQuestionnairesStore = defineStore('questionnaires', () => {
     const { questions: newQuestions, ...metaData } = newQuestionnaireData
     const newQuestionnaire = { ...metaData, id: newId, lastUpdated: new Date().toISOString() }
     questionnaires.value.push(newQuestionnaire)
-    // Also add the questions to the allQuestions list
     const questionsToAdd = newQuestions.map((q) => ({
       ...q,
-      assessment_name: newQuestionnaire.name, // Use the name from the new metadata
-      uuid: undefined, // Do not persist temporary UI key
+      assessment_name: newQuestionnaire.name,
+      uuid: undefined,
     }))
     allQuestions.value.push(...questionsToAdd)
-    console.log('Added new questionnaire:', newQuestionnaire)
     return { success: true, newQuestionnaire: newQuestionnaire }
   }
 
   const deleteQuestionnaire = (questionnaireId) => {
     const qIndex = questionnaires.value.findIndex((q) => q.id === questionnaireId)
     if (qIndex === -1) {
-      console.error('Questionnaire to delete not found')
       return { success: false, message: 'Questionnaire not found' }
     }
 
     const questionnaireToDelete = questionnaires.value[qIndex]
     const assessmentName = questionnaireToDelete.name
 
-    // Remove the questionnaire
     questionnaires.value.splice(qIndex, 1)
 
-    // Remove all associated questions
     allQuestions.value = allQuestions.value.filter((q) => q.assessment_name !== assessmentName)
 
-    console.log(`Deleted questionnaire "${assessmentName}" and its questions.`)
     return { success: true }
   }
 
@@ -2795,7 +2789,6 @@ export const useQuestionnairesStore = defineStore('questionnaires', () => {
       return { success: false, message: 'Original questionnaire not found' }
     }
 
-    // --- Generate a unique name for the duplicate ---
     const baseName = original.name.replace(/ \d+$/, '').trim()
     let counter = 1
     let newName = `${baseName} ${counter}`
@@ -2805,7 +2798,6 @@ export const useQuestionnairesStore = defineStore('questionnaires', () => {
       newName = `${baseName} ${counter}`
     }
 
-    // --- Create the new questionnaire ---
     const newId =
       questionnaires.value.length > 0 ? Math.max(...questionnaires.value.map((q) => q.id)) + 1 : 1
     const newQuestionnaire = {
@@ -2817,7 +2809,6 @@ export const useQuestionnairesStore = defineStore('questionnaires', () => {
     }
     questionnaires.value.push(newQuestionnaire)
 
-    // --- Duplicate the questions ---
     const originalQuestions = getQuestionsForAssessment(original.name)
     const newQuestions = JSON.parse(JSON.stringify(originalQuestions)).map((q) => ({
       ...q,
