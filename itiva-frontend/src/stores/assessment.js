@@ -9,6 +9,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { validateQuestionnaireData } from '@/utils/testUtils'
+import { useAuditStore } from './audit'
 
 export const useAssessmentStore = defineStore('assessment', () => {
   // --- State ---
@@ -110,6 +111,9 @@ export const useAssessmentStore = defineStore('assessment', () => {
         createdAt: new Date().toISOString(),
         lastModified: new Date().toISOString(),
       }
+
+      const auditStore = useAuditStore()
+      auditStore.addLog('User started assessment', { type })
 
       _saveDraftToStorage()
       return { success: true, draft: draft.value }

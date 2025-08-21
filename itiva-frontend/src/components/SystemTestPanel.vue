@@ -5,6 +5,7 @@ import { useAuthStore } from '@/stores/auth'
 import { useAssessmentStore } from '@/stores/assessment'
 import { useReportsStore } from '@/stores/reports'
 import { useQuestionnairesStore } from '@/stores/questionnaires'
+import { useAuditStore } from '@/stores/audit'
 import { runApplicationTests, validateQuestionnaireData } from '@/utils/testUtils'
 
 const props = defineProps({
@@ -33,6 +34,8 @@ const runAllTests = async () => {
   testResults.value = null
 
   try {
+    const auditStore = useAuditStore()
+    auditStore.addLog('User ran system check')
     // Create application context for testing
     const appContext = {
       authStore,

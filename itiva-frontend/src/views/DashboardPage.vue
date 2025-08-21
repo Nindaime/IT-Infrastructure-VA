@@ -7,6 +7,7 @@ import { useAuthStore } from '@/stores/auth' // Import the auth store
 import { useReportsStore } from '@/stores/reports' // Import the new reports store
 import { useQuestionnairesStore } from '@/stores/questionnaires' // Import the questionnaires store
 import { useUiStore } from '@/stores/ui' // Import the UI store
+import { useAuditStore } from '@/stores/audit'
 import AppHeader from '@/components/AppHeader.vue'
 import AppFooter from '@/components/AppFooter.vue'
 import SystemTestPanel from '@/components/SystemTestPanel.vue'
@@ -47,6 +48,7 @@ const reportsStore = useReportsStore()
 const uiStore = useUiStore()
 const questionnairesStore = useQuestionnairesStore()
 const assessmentStore = useAssessmentStore()
+const auditStore = useAuditStore()
 
 // Get toast functions
 const showToast = inject('showToast')
@@ -508,11 +510,11 @@ function closeSystemTestPanel() {
           <div
             ref="reportsContainer"
             v-if="filteredReports.length > 0"
-            class="max-h-96 overflow-y-auto"
+            class="hidden md:block relative overflow-y-auto max-h-80 custom-scrollbar"
           >
             <!-- Desktop Table View -->
-            <table class="hidden md:table min-w-full divide-y divide-gray-200">
-              <thead class="bg-gray-50 sticky top-0">
+            <table class="min-w-full divide-y divide-gray-200">
+              <thead class="bg-gray-50 sticky top-0 z-10">
                 <tr>
                   <th
                     scope="col"
@@ -574,28 +576,6 @@ function closeSystemTestPanel() {
                         </svg>
                         Draft
                       </span>
-                      <!-- Continue assessment button for drafts -->
-                      <button
-                        v-if="report.isDraft && !isAdminView"
-                        @click="continueAssessment(report)"
-                        class="ml-2 text-gray-400 cursor-pointer hover:text-blue-600 transition-colors"
-                        title="Continue Assessment"
-                      >
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          class="h-4 w-4"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                          stroke-width="2"
-                        >
-                          <path
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                            d="M13 7l5 5m0 0l-5 5m5-5H6"
-                          />
-                        </svg>
-                      </button>
                     </div>
                   </td>
                   <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
@@ -629,6 +609,13 @@ function closeSystemTestPanel() {
                         class="text-blue-600 hover:text-blue-900 transition-colors duration-200 cursor-pointer"
                       >
                         View Report
+                      </button>
+                      <button
+                        v-if="report.isDraft && !isAdminView"
+                        @click="continueAssessment(report)"
+                        class="text-blue-600 hover:text-blue-900 transition-colors duration-200 cursor-pointer"
+                      >
+                        Continue Draft
                       </button>
                       <!-- Delete button - only shown to the actual user, not in admin view -->
                       <button
@@ -1109,5 +1096,20 @@ function closeSystemTestPanel() {
 .fade-enter-from,
 .fade-leave-to {
   opacity: 0;
+}
+
+/* Custom scrollbar for tables */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #a8a8a8;
+  border-radius: 3px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #888;
 }
 </style>

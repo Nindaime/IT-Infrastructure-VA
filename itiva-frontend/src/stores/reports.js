@@ -10,6 +10,7 @@ import { useAuthStore } from './auth'
 import { v4 as uuidv4 } from 'uuid'
 import { safeStorage } from '@/utils/errorHandler'
 import { validateReportData, validateRequiredFields } from '@/utils/testUtils'
+import { useAuditStore } from './audit'
 
 export const useReportsStore = defineStore('reports', () => {
   // --- State ---
@@ -174,6 +175,10 @@ export const useReportsStore = defineStore('reports', () => {
     }
     allCompletedReports.value.push(newReport)
     saveReportsToStorage()
+
+    const auditStore = useAuditStore()
+    auditStore.addLog('User saved assessment', { name: newReport.name })
+
     return newReport
   }
 
@@ -193,6 +198,7 @@ export const useReportsStore = defineStore('reports', () => {
 
       // Check if a draft with the same *ID* already exists in our list.
       const draftIndex = allDraftReports.value.findIndex((d) => d.id === draftData.id)
+      const auditStore = useAuditStore()
 
       if (draftIndex !== -1) {
         // --- UPDATE PATH ---
@@ -208,6 +214,7 @@ export const useReportsStore = defineStore('reports', () => {
           lastModified: new Date().toISOString(),
         }
         saveReportsToStorage()
+        auditStore.addLog('User saved draft', { name: draftData.name })
         return { success: true, draft: draftReports.value[draftIndex], operation: 'updated' }
       } else {
         // --- ADD PATH ---
@@ -225,6 +232,7 @@ export const useReportsStore = defineStore('reports', () => {
         }
         allDraftReports.value.push(newDraft)
         saveReportsToStorage()
+        auditStore.addLog('User saved draft', { name: newDraft.name })
         return { success: true, draft: newDraft, operation: 'added' }
       }
     } catch (error) {
@@ -292,8 +300,11 @@ export const useReportsStore = defineStore('reports', () => {
       (r) => r.id === reportId && r.userId === authStore.currentUser.id,
     )
     if (index !== -1) {
+      const deletedReport = allCompletedReports.value[index]
       allCompletedReports.value.splice(index, 1)
       saveReportsToStorage()
+      const auditStore = useAuditStore()
+      auditStore.addLog('User deleted report', { id: deletedReport.id })
       return { success: true, type: 'completed' }
     }
 
@@ -302,8 +313,11 @@ export const useReportsStore = defineStore('reports', () => {
       (d) => d.id === reportId && d.userId === authStore.currentUser.id,
     )
     if (index !== -1) {
+      const deletedDraft = allDraftReports.value[index]
       allDraftReports.value.splice(index, 1)
       saveReportsToStorage()
+      const auditStore = useAuditStore()
+      auditStore.addLog('User deleted report', { id: deletedDraft.id })
       return { success: true, type: 'draft' }
     }
 
@@ -332,6 +346,8 @@ export const useReportsStore = defineStore('reports', () => {
       if (completedReport) {
         // Security check: ensure the report belongs to the current user
         if (completedReport.userId === currentUserId) {
+          const auditStore = useAuditStore()
+          auditStore.addLog('User viewed report', { name: completedReport.name })
           return { ...completedReport, isDraft: false }
         }
       }
@@ -341,6 +357,8 @@ export const useReportsStore = defineStore('reports', () => {
       if (draftReport) {
         // Security check for drafts
         if (draftReport.userId === currentUserId) {
+          const auditStore = useAuditStore()
+          auditStore.addLog('User viewed report', { name: draftReport.name })
           return { ...draftReport, isDraft: true }
         }
       }

@@ -6,6 +6,7 @@ import { useRouter, RouterLink } from 'vue-router' // Import RouterLink for navi
 import { useReportsStore } from '@/stores/reports' // Import the reports store
 import { useQuestionnairesStore } from '@/stores/questionnaires' // Import the new questionnaires store
 import { useUiStore } from '@/stores/ui' // Import the UI store
+import { useAuditStore } from '@/stores/audit' // Import the audit store
 import { mockRankings } from '@/api/mockData' // Using mock data
 import AppFooter from '@/components/AppFooter.vue'
 
@@ -23,6 +24,7 @@ const reportsStore = useReportsStore()
 const uiStore = useUiStore()
 const showToast = inject('showToast')
 const questionnairesStore = useQuestionnairesStore() // Use the store
+const auditStore = useAuditStore()
 const activeAssessments = ref(25)
 const pendingApprovals = ref(5)
 
@@ -34,6 +36,8 @@ const questionnaires = computed(() =>
     questionsCount: questionnairesStore.getQuestionCountForAssessment(q.name),
   })),
 )
+
+const auditLogs = computed(() => auditStore.logs)
 
 // This computed property combines mock businesses with real, qualified users
 const allBusinesses = computed(() => {
@@ -190,16 +194,16 @@ const modalConfig = ref({
   message: '',
   action: null,
   confirmText: 'Confirm',
-  confirmColor: 'bg-red-600',
+  confirmColor: 'bg-red-600 hover:bg-red-700',
 })
-const selectedQuestionnaire = ref(null)
+const itemForAction = ref(null)
 
 function promptDelete(questionnaire) {
-  selectedQuestionnaire.value = questionnaire
+  itemForAction.value = questionnaire
   modalConfig.value = {
     title: 'Confirm Deletion',
     message: `Are you sure you want to delete the questionnaire "${questionnaire.name}"? This will also delete all of its questions and cannot be undone.`,
-    action: 'delete',
+    action: 'delete-questionnaire',
     confirmText: 'Delete',
     confirmColor: 'bg-red-600 hover:bg-red-700',
   }
@@ -207,32 +211,51 @@ function promptDelete(questionnaire) {
 }
 
 function promptDuplicate(questionnaire) {
-  selectedQuestionnaire.value = questionnaire
+  itemForAction.value = questionnaire
   modalConfig.value = {
     title: 'Confirm Duplication',
     message: `Are you sure you want to duplicate the questionnaire "${questionnaire.name}"? A new draft will be created.`,
-    action: 'duplicate',
+    action: 'duplicate-questionnaire',
     confirmText: 'Duplicate',
     confirmColor: 'bg-blue-600 hover:bg-blue-700',
   }
   showConfirmModal.value = true
 }
 
+function promptDeleteAuditLog(log) {
+  itemForAction.value = log
+  modalConfig.value = {
+    title: 'Confirm Deletion',
+    message: `Are you sure you want to delete this audit log entry from ${new Date(
+      log.timestamp,
+    ).toLocaleString()}? This action cannot be undone.`,
+    action: 'delete-audit',
+    confirmText: 'Delete',
+    confirmColor: 'bg-red-600 hover:bg-red-700',
+  }
+  showConfirmModal.value = true
+}
+
 function handleConfirm() {
-  if (!selectedQuestionnaire.value) return
-  if (modalConfig.value.action === 'delete') {
-    questionnairesStore.deleteQuestionnaire(selectedQuestionnaire.value.id)
+  if (!itemForAction.value) return
+  const action = modalConfig.value.action
+
+  if (action === 'delete-questionnaire') {
+    questionnairesStore.deleteQuestionnaire(itemForAction.value.id)
     showToast('Questionnaire deleted successfully.', 'success')
-  } else if (modalConfig.value.action === 'duplicate') {
-    questionnairesStore.duplicateQuestionnaire(selectedQuestionnaire.value.id)
+  } else if (action === 'duplicate-questionnaire') {
+    questionnairesStore.duplicateQuestionnaire(itemForAction.value.id)
     showToast('Questionnaire duplicated successfully.', 'success')
+  } else if (action === 'delete-audit') {
+    auditStore.deleteLog(itemForAction.value.id)
+    showToast('Audit log deleted.', 'success')
   }
   cancelAction()
 }
 
 function cancelAction() {
   showConfirmModal.value = false
-  selectedQuestionnaire.value = null
+  itemForAction.value = null
 }
 
 /**
@@ -243,6 +266,8 @@ function viewBusinessDashboard(business) {
   if (!business.isRealUser) return
   // Extract the user ID from the business object's ID (e.g., 'user-xyz' -> 'xyz')
   const userId = business.id.replace('user-', '')
+  const auditStore = useAuditStore()
+  auditStore.addLog('Admin viewed user dashboard', { userId: userId })
   router.push({
     name: 'dashboard',
     query: { viewAsAdmin: 'true', userId: userId },
@@ -282,6 +307,20 @@ const scrollToTop = () => {
     top: 0,
     behavior: 'smooth',
   })
+}
+
+function formatLogDetails(details) {
+  if (!details || Object.keys(details).length === 0) {
+    return ''
+  }
+  if (details.name) {
+    return details.name
+  }
+  if (details.from && details.to) {
+    return `${details.from} to ${details.to}`
+  }
+  // General case: extract all values and join them.
+  return Object.values(details).join(', ')
 }
 </script>
 
@@ -550,7 +589,7 @@ const scrollToTop = () => {
         </section>
 
         <!-- Questionnaire Management Section -->
-        <section class="bg-white rounded-lg shadow p-6">
+        <section class="bg-white rounded-lg shadow p-6 mb-8">
           <h2 class="text-2xl font-semibold text-gray-800 mb-4">Questionnaire Management</h2>
           <div class="mb-4">
             <button
@@ -700,7 +739,7 @@ const scrollToTop = () => {
                     </button>
                     <button
                       @click="promptDelete(q)"
-                      class="p-2 text-red-500 hover:text-red-700 transition-colors rounded-full hover:bg-gray-100"
+                      class="p-2 text-red-500 hover:text-red-700 transition-colors rounded-full hover:bg-gray-100 cursor-pointer"
                       title="Delete Questionnaire"
                     >
                       <svg
@@ -735,6 +774,87 @@ const scrollToTop = () => {
                 </div>
               </div>
             </div>
+          </div>
+        </section>
+
+        <!-- Audit Log Section -->
+        <section class="bg-white rounded-lg shadow p-6">
+          <h2 class="text-2xl font-semibold text-gray-800 mb-4">Audit Log</h2>
+          <div class="relative overflow-y-auto max-h-80 custom-scrollbar">
+            <table class="min-w-full divide-y divide-gray-200">
+              <thead class="bg-gray-50 sticky top-0 z-10">
+                <tr>
+                  <th
+                    scope="col"
+                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  >
+                    Timestamp
+                  </th>
+                  <th
+                    scope="col"
+                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  >
+                    User
+                  </th>
+                  <th
+                    scope="col"
+                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  >
+                    Activity
+                  </th>
+                  <th
+                    scope="col"
+                    class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  >
+                    Details
+                  </th>
+                  <th scope="col" class="relative px-6 py-3">
+                    <span class="sr-only">Actions</span>
+                  </th>
+                </tr>
+              </thead>
+              <tbody class="bg-white divide-y divide-gray-200">
+                <tr v-if="auditLogs.length === 0">
+                  <td colspan="4" class="text-center py-10 text-gray-500">No audit logs found.</td>
+                </tr>
+                <tr v-for="log in auditLogs" :key="log.id">
+                  <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {{ new Date(log.timestamp).toLocaleString() }}
+                  </td>
+                  <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {{ log.user.name }}
+                  </td>
+                  <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {{ log.activity }}
+                  </td>
+                  <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <pre class="whitespace-pre-wrap">{{ formatLogDetails(log.details) }}</pre>
+                  </td>
+                  <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                    <button
+                      @click="promptDeleteAuditLog(log)"
+                      class="text-red-600 hover:text-red-800 transition-colors duration-200 cursor-pointer"
+                      title="Delete Log Entry"
+                    >
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        class="h-5 w-5"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        stroke-width="2"
+                      >
+                        <path
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                        />
+                      </svg>
+                    </button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
           </div>
         </section>
       </div>
@@ -804,5 +924,19 @@ const scrollToTop = () => {
 .flash-out-fade-leave-to {
   opacity: 0;
   transform: translateY(-20px); /* Moves up slightly while fading out */
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #a8a8a8;
+  border-radius: 3px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #888;
 }
 </style>

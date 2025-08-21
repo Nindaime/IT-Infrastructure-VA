@@ -8,6 +8,7 @@ import ReportViewerPage from '@/views/ReportViewerPage.vue'
 import AdminDashboardPage from '@/views/admin/AdminDashboardPage.vue'
 import EditQuestionnairePage from '@/views/admin/EditQuestionnairePage.vue'
 import LinkAccountsPage from '@/views/LinkAccountsPage.vue' // New import
+import { useAuthStore } from '@/stores/auth'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -17,6 +18,19 @@ const router = createRouter({
       name: 'home',
       component: HomePage,
       meta: { showHeaderAndFooter: true },
+      beforeEnter: (to, from, next) => {
+        const authStore = useAuthStore()
+        authStore.checkAuthStatus()
+        if (authStore.isAuthenticated) {
+          if (authStore.currentUser.isAdmin) {
+            next({ name: 'adminDashboard' })
+          } else {
+            next({ name: 'dashboard' })
+          }
+        } else {
+          next()
+        }
+      },
     },
     {
       path: '/about',
@@ -78,45 +92,5 @@ const router = createRouter({
     return { top: 0 }
   },
 })
-
-// // Global navigation guard to handle draft saving
-// router.beforeEach(async (to, from, next) => {
-//   // Check if user is navigating away from questionnaire page
-//   if (from.name === 'questionnaire') {
-//     try {
-//       // Dynamically import stores to avoid circular dependencies
-//       const { useAssessmentStore } = await import('@/stores/assessment')
-//       const { useReportsStore } = await import('@/stores/reports')
-
-//       const assessmentStore = useAssessmentStore()
-//       const reportsStore = useReportsStore()
-
-//       // Check if there's an active draft
-//       if (assessmentStore.hasActiveDraft && assessmentStore.isDraftMode) {
-//         // Store the target route for later navigation
-//         const targetRoute = to.fullPath
-
-//         // Create a custom event to trigger the draft save modal
-//         const draftSaveEvent = new CustomEvent('show-draft-save-modal', {
-//           detail: {
-//             targetRoute,
-//             assessmentStore,
-//             reportsStore,
-//           },
-//         })
-
-//         // Dispatch the event
-//         window.dispatchEvent(draftSaveEvent)
-
-//         // Prevent immediate navigation
-//         return false
-//       }
-//     } catch (error) {
-//       console.error('Error in navigation guard:', error)
-//     }
-//   }
-
-//   next()
-// })
 
 export default router

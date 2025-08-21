@@ -209,13 +209,15 @@ async function handleRegister() {
 
   try {
     // Step 1: Register the user using the new system
-    authStore.register(userData)
+    const response = await authStore.register(userData)
 
     // Step 2: Immediately log the new user in to create an active session.
-    await authStore.login(userData.userName, userData.password)
+    if (response && response.success) {
+        await authStore.login(userData.userName, userData.password)
+        // Step 3: Redirect to the dashboard, now with an active session.
+        await router.push('/dashboard')
+    }
 
-    // Step 3: Redirect to the dashboard, now with an active session.
-    await router.push('/dashboard')
   } catch (error) {
     errorMessage.value = 'Registration failed. Please try again.'
     console.error('Registration error:', error)

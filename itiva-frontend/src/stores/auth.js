@@ -4,6 +4,7 @@ import { ref, computed } from 'vue'
 import { safeStorage } from '@/utils/errorHandler'
 import { v4 as uuidv4 } from 'uuid' // Import UUID for unique user IDs
 import { validateUserData, validateRequiredFields } from '@/utils/testUtils'
+import { useAuditStore } from './audit'
 
 export const useAuthStore = defineStore('auth', () => {
   // State
@@ -126,8 +127,10 @@ export const useAuthStore = defineStore('auth', () => {
       // Save to localStorage
       saveUsersToStorage()
 
-      // Auto-login after registration
-      await login(newUser.userName, newUser.password)
+      // Audit log for registration
+      const auditStore = useAuditStore()
+      auditStore.addLog('User Registered')
+      // await login(newUser.userName, newUser.password)
 
       return { success: true, user: newUser }
     } catch (error) {
@@ -166,6 +169,10 @@ export const useAuthStore = defineStore('auth', () => {
       safeStorage.setItem('auth-currentUser', user)
       safeStorage.setItem('auth-isAuthenticated', true)
 
+      // Audit log
+      const auditStore = useAuditStore()
+      auditStore.addLog('User logged in')
+
       return { success: true, user }
     } catch (error) {
       console.error('Login error:', error)
@@ -175,6 +182,9 @@ export const useAuthStore = defineStore('auth', () => {
 
   const logout = () => {
     try {
+      const auditStore = useAuditStore()
+      auditStore.addLog('User logged out')
+
       // Clear current user and authentication state
       currentUser.value = null
       isAuthenticated.value = false

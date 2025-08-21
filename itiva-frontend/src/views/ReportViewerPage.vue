@@ -9,6 +9,7 @@ import AppFooter from '@/components/AppFooter.vue'
 import { useAssessmentStore } from '@/stores/assessment'
 import { useReportsStore } from '@/stores/reports'
 import { useAuthStore } from '@/stores/auth'
+import { useAuditStore } from '@/stores/audit'
 import DownloadIcon from '@/components/icons/DownloadIcon.vue'
 import BackIcon from '@/components/icons/BackIcon.vue'
 import html2canvas from 'html2canvas'
@@ -38,6 +39,7 @@ const route = useRoute()
 // --- Store Initialization ---
 const assessmentStore = useAssessmentStore()
 const reportsStore = useReportsStore()
+const auditStore = useAuditStore()
 
 // --- Admin View Logic ---
 const isAdminView = computed(() => route.query.viewAsAdmin === 'true')
@@ -251,6 +253,7 @@ function createOrUpdateChart(data, canvasId = 'reportRadarChart') {
 async function downloadReportAsPDF() {
   if (isDownloading.value) return
   isDownloading.value = true
+  auditStore.addLog('User downloaded report', { name: reportData.value.name })
   const sourceNode = fullReportForPdf.value
 
   // Store original width to restore it later
@@ -444,7 +447,8 @@ async function downloadReportAsPDF() {
         bold: false,
       },
       { text: lowestCat.name, bold: true },
-      { text: ', which scored a low ', bold: false },
+      { text: ', which scored a low ',
+        bold: false },
       { text: String(lowestCat.score), bold: true },
       { text: ', representing a key area for improvement.', bold: false },
       { text: '\n\n', bold: false },
