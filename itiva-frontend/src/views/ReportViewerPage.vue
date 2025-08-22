@@ -1,18 +1,16 @@
 <script setup>
-import { ref, onMounted, onBeforeUnmount, computed, nextTick } from 'vue'
+import { ref, onMounted, computed, nextTick } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import jsPDF from 'jspdf'
 import { applyPlugin } from 'jspdf-autotable'
 import Chart from 'chart.js/auto'
 import AppHeader from '@/components/AppHeader.vue'
 import AppFooter from '@/components/AppFooter.vue'
-import { useAssessmentStore } from '@/stores/assessment'
 import { useReportsStore } from '@/stores/reports'
 import { useAuthStore } from '@/stores/auth'
 import { useAuditStore } from '@/stores/audit'
 import DownloadIcon from '@/components/icons/DownloadIcon.vue'
 import BackIcon from '@/components/icons/BackIcon.vue'
-import html2canvas from 'html2canvas'
 
 // Apply the autotable plugin to the jsPDF constructor
 applyPlugin(jsPDF)
@@ -37,7 +35,6 @@ const router = useRouter()
 const route = useRoute()
 
 // --- Store Initialization ---
-const assessmentStore = useAssessmentStore()
 const reportsStore = useReportsStore()
 const auditStore = useAuditStore()
 

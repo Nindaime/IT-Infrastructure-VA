@@ -7,7 +7,6 @@ import { useAuthStore } from '@/stores/auth' // Import the auth store
 import { useReportsStore } from '@/stores/reports' // Import the new reports store
 import { useQuestionnairesStore } from '@/stores/questionnaires' // Import the questionnaires store
 import { useUiStore } from '@/stores/ui' // Import the UI store
-import { useAuditStore } from '@/stores/audit'
 import AppHeader from '@/components/AppHeader.vue'
 import AppFooter from '@/components/AppFooter.vue'
 import SystemTestPanel from '@/components/SystemTestPanel.vue'
@@ -48,7 +47,6 @@ const reportsStore = useReportsStore()
 const uiStore = useUiStore()
 const questionnairesStore = useQuestionnairesStore()
 const assessmentStore = useAssessmentStore()
-const auditStore = useAuditStore()
 
 // Get toast functions
 const showToast = inject('showToast')
@@ -362,11 +360,12 @@ async function goToLinkAccounts() {
 async function logout() {
   try {
     isLoading.value = true
+    showSettingsMenu.value = false // Close menu
     console.log('User logged out.')
     showToast('Logging out...', 'info')
     // In a real app, this would clear authentication tokens.
-    await router.push('/')
     authStore.logout() // Use the store's logout action
+    await router.push('/login')
   } catch (error) {
     console.error('Error during logout:', error)
     showToast('Error during logout', 'error')

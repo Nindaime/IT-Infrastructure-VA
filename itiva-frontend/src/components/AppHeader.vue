@@ -1,12 +1,12 @@
 <!-- src/components/AppHeader.vue -->
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useQuestionnairesStore } from '@/stores/questionnaires'
 import { useAuthStore } from '@/stores/auth' // Import the auth store
 import { RouterLink, useRouter, useRoute } from 'vue-router'
 
 // Define props to control the header's appearance and behavior
-const props = defineProps({
+defineProps({
   // showNewAssessment prop is still relevant for controlling the "New Assessment" button visibility
   // The type of assessment, to be displayed on the Questionnaire page
   assessmentType: {
@@ -40,6 +40,10 @@ const showSettingsMenu = ref(false)
 const showAssessmentMenu = ref(false)
 const isMobileMenuOpen = ref(false)
 
+const newAssessmentDropdown = ref(null)
+const changeAssessmentDropdown = ref(null)
+const settingsDropdown = ref(null)
+
 const activeAssessments = computed(() =>
   questionnairesStore.questionnaires
     .filter((q) => q.status === 'Active')
@@ -47,6 +51,27 @@ const activeAssessments = computed(() =>
       name: q.name,
     })),
 )
+
+const handleClickOutside = (event) => {
+  if (
+    (newAssessmentDropdown.value && newAssessmentDropdown.value.contains(event.target)) ||
+    (changeAssessmentDropdown.value && changeAssessmentDropdown.value.contains(event.target)) ||
+    (settingsDropdown.value && settingsDropdown.value.contains(event.target))
+  ) {
+    return
+  }
+  showAssessmentMenu.value = false
+  showSettingsMenu.value = false
+}
+
+onMounted(() => {
+  document.addEventListener('mousedown', handleClickOutside)
+})
+
+onBeforeUnmount(() => {
+  document.removeEventListener('mousedown', handleClickOutside)
+})
+
 /**
  * Toggles the visibility of the user settings dropdown menu.
  */
@@ -151,7 +176,7 @@ function handleLogout() {
           <!-- Right side: User controls -->
           <div class="flex items-center space-x-4">
             <!-- New Assessment Dropdown (for Dashboard) -->
-            <div v-if="showNewAssessment" class="relative">
+            <div v-if="showNewAssessment" class="relative" ref="newAssessmentDropdown">
               <button
                 @click="toggleAssessmentMenu"
                 class="hidden sm:inline-flex cursor-pointer items-center bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors"
@@ -162,7 +187,6 @@ function handleLogout() {
                 <div
                   v-if="showAssessmentMenu"
                   class="absolute right-0 mt-2 w-50 bg-white rounded-md shadow-xl z-50 py-1"
-                  @click.away="showAssessmentMenu = false"
                 >
                   <RouterLink
                     v-for="assessment in activeAssessments"
@@ -178,7 +202,7 @@ function handleLogout() {
             </div>
 
             <!-- Change Assessment Type Dropdown (for Questionnaire) -->
-            <div v-if="showAssessmentTypeMenu" class="relative">
+            <div v-if="showAssessmentTypeMenu" class="relative" ref="changeAssessmentDropdown">
               <button
                 @click="toggleAssessmentMenu"
                 class="flex items-center cursor-pointer text-gray-600 hover:text-blue-600 transition-colors"
@@ -196,7 +220,6 @@ function handleLogout() {
                 <div
                   v-if="showAssessmentMenu"
                   class="absolute right-0 mt-2 w-64 bg-white rounded-md shadow-xl z-50 py-1"
-                  @click.away="showAssessmentMenu = false"
                 >
                   <button
                     v-for="assessment in activeAssessments"
@@ -218,7 +241,7 @@ function handleLogout() {
             </div>
 
             <!-- Settings Icon and Dropdown Menu -->
-            <div class="relative">
+            <div class="relative" ref="settingsDropdown">
               <button
                 @click="toggleSettingsMenu"
                 class="focus:outline-none cursor-pointer p-2 rounded-full hover:bg-gray-100 transition-colors"
@@ -248,7 +271,6 @@ function handleLogout() {
                 <div
                   v-if="showSettingsMenu"
                   class="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-xl z-50 py-1"
-                  @click.away="showSettingsMenu = false"
                 >
                   <!-- Conditionally show "Dashboard" or "Link Accounts" based on the current page -->
                   <RouterLink
