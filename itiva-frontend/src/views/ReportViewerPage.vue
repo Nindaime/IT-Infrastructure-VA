@@ -447,8 +447,7 @@ async function downloadReportAsPDF() {
         bold: false,
       },
       { text: lowestCat.name, bold: true },
-      { text: ', which scored a low ',
-        bold: false },
+      { text: ', which scored a low ', bold: false },
       { text: String(lowestCat.score), bold: true },
       { text: ', representing a key area for improvement.', bold: false },
       { text: '\n\n', bold: false },
@@ -709,7 +708,7 @@ onMounted(() => {
                 <div class="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
                 <p>AI is analyzing the results...</p>
               </div>
-              <p v-else class="text-gray-600 leading-relaxed" v-html="summary"></p>
+              <p v-else class="text-gray-600 leading-relaxed text-justify" v-html="summary"></p>
             </section>
 
             <section class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8 pb-8 border-b">
@@ -745,7 +744,7 @@ onMounted(() => {
             <!-- <section v-if="reportData.recommendations && reportData.recommendations.length > 0"> -->
             <section v-if="reportData.recommendations">
               <h2 class="text-xl font-bold text-gray-800 mb-4">Prioritized Recommendations</h2>
-              <div class="overflow-x-auto">
+              <div class="overflow-x-auto -mx-4 sm:mx-0">
                 <table class="min-w-full bg-white">
                   <thead class="bg-gray-100">
                     <tr>
@@ -767,13 +766,15 @@ onMounted(() => {
                       class="border-b"
                       :class="{ 'pdf-only': index >= 3 }"
                     >
-                      <td class="py-3 px-4 text-gray-700">{{ rec.text }}</td>
+                      <td class="py-3 px-4 text-gray-700 text-sm md:text-base">{{ rec.text }}</td>
                       <td
-                        class="py-3 px-4 bg-gray-100 text-center text-sm font-medium text-gray-800"
+                        class="py-3 px-4 bg-gray-100 text-center text-sm font-medium text-gray-800 md:text-base"
                       >
                         {{ rec.category }}
                       </td>
-                      <td class="py-3 px-4 font-bold text-green-600 text-center">
+                      <td
+                        class="py-3 px-4 font-bold text-green-600 text-center text-sm md:text-base"
+                      >
                         +{{ rec.impactScore }} pts
                       </td>
                     </tr>

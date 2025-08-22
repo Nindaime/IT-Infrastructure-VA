@@ -510,10 +510,10 @@ function closeSystemTestPanel() {
           <div
             ref="reportsContainer"
             v-if="filteredReports.length > 0"
-            class="hidden md:block relative overflow-y-auto max-h-80 custom-scrollbar"
+            class="relative overflow-y-auto max-h-80 custom-scrollbar"
           >
             <!-- Desktop Table View -->
-            <table class="min-w-full divide-y divide-gray-200">
+            <table class="hidden md:table min-w-full divide-y divide-gray-200">
               <thead class="bg-gray-50 sticky top-0 z-10">
                 <tr>
                   <th
