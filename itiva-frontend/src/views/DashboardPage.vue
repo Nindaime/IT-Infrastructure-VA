@@ -69,6 +69,7 @@ const showSystemTestPanel = ref(false)
 // Loading states
 const isLoading = ref(false)
 const isDeleting = ref(false)
+const showScrollTopButton = ref(false)
 
 // --- Data Source Logic ---
 // This computed property dynamically determines which reports to show.
@@ -376,6 +377,9 @@ async function logout() {
 
 // Lifecycle hook to show welcome modal on first visit
 onMounted(() => {
+  if (mainContent.value) {
+    mainContent.value.addEventListener('scroll', handleScroll)
+  }
   // Only show the welcome modal for a regular user, not in admin view.
   if (isAdminView.value) return
 
@@ -391,9 +395,23 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
+  if (mainContent.value) {
+    mainContent.value.removeEventListener('scroll', handleScroll)
+  }
   // Clean up the scroll container when leaving the page
   uiStore.setMainScrollContainer(null)
 })
+
+const handleScroll = () => {
+  showScrollTopButton.value = mainContent.value && mainContent.value.scrollTop > 400
+}
+
+const scrollToTop = () => {
+  mainContent.value?.scrollTo({
+    top: 0,
+    behavior: 'smooth',
+  })
+}
 
 /**
  * Opens the system test panel.
@@ -922,8 +940,26 @@ function closeSystemTestPanel() {
           </div>
         </section>
       </div>
+      <AppFooter class="mt-8" />
     </main>
-    <AppFooter />
+    <!-- Scroll-to-top Button -->
+    <transition name="fade">
+      <button
+        v-if="showScrollTopButton"
+        @click="scrollToTop"
+        class="fixed bottom-8 right-8 bg-blue-600 text-white p-3 rounded-full shadow-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all z-50"
+        aria-label="Scroll to top"
+      >
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M5 15l7-7 7 7"
+          ></path>
+        </svg>
+      </button>
+    </transition>
 
     <!-- Welcome Modal: Displays a welcome message when the dashboard is loaded -->
     <transition name="flash-out-fade">

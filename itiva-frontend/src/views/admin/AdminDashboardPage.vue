@@ -780,7 +780,9 @@ function formatLogDetails(details) {
         <!-- Audit Log Section -->
         <section class="bg-white rounded-lg shadow p-6">
           <h2 class="text-2xl font-semibold text-gray-800 mb-4">Audit Log</h2>
-          <div class="relative overflow-y-auto max-h-80 custom-scrollbar">
+
+          <!-- Desktop Table View -->
+          <div class="hidden md:block relative overflow-y-auto max-h-80 custom-scrollbar">
             <table class="min-w-full divide-y divide-gray-200">
               <thead class="bg-gray-50 sticky top-0 z-10">
                 <tr>
@@ -815,7 +817,7 @@ function formatLogDetails(details) {
               </thead>
               <tbody class="bg-white divide-y divide-gray-200">
                 <tr v-if="auditLogs.length === 0">
-                  <td colspan="4" class="text-center py-10 text-gray-500">No audit logs found.</td>
+                  <td colspan="5" class="text-center py-10 text-gray-500">No audit logs found.</td>
                 </tr>
                 <tr v-for="log in auditLogs" :key="log.id">
                   <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
@@ -828,7 +830,9 @@ function formatLogDetails(details) {
                     {{ log.activity }}
                   </td>
                   <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    <pre class="whitespace-pre-wrap">{{ formatLogDetails(log.details) }}</pre>
+                    <pre class="whitespace-pre-wrap font-sans">{{
+                      formatLogDetails(log.details)
+                    }}</pre>
                   </td>
                   <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                     <button
@@ -856,8 +860,61 @@ function formatLogDetails(details) {
               </tbody>
             </table>
           </div>
+
+          <!-- Mobile Card View -->
+          <div class="md:hidden space-y-3 overflow-y-auto max-h-96 custom-scrollbar">
+            <div v-if="auditLogs.length === 0" class="text-center py-10 text-gray-500">
+              No audit logs found.
+            </div>
+            <div
+              v-for="log in auditLogs"
+              :key="log.id"
+              class="bg-gray-50 p-4 rounded-lg border border-gray-200"
+            >
+              <div class="flex justify-between items-start">
+                <div class="flex-grow pr-4">
+                  <p class="text-sm font-medium text-gray-800">{{ log.activity }}</p>
+                  <p class="text-xs text-gray-500">by {{ log.user.name }}</p>
+                  <p class="text-xs text-gray-400 mt-1">
+                    {{ new Date(log.timestamp).toLocaleString() }}
+                  </p>
+                  <div
+                    v-if="formatLogDetails(log.details)"
+                    class="mt-2 text-xs text-gray-600 bg-white p-2 rounded border"
+                  >
+                    <pre class="whitespace-pre-wrap font-sans">{{
+                      formatLogDetails(log.details)
+                    }}</pre>
+                  </div>
+                </div>
+                <div class="flex-shrink-0">
+                  <button
+                    @click="promptDeleteAuditLog(log)"
+                    class="p-2 text-red-500 hover:text-red-700 transition-colors rounded-full hover:bg-gray-100"
+                    title="Delete Log Entry"
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      class="h-5 w-5"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      stroke-width="2"
+                    >
+                      <path
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                      />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
         </section>
       </div>
+      <AppFooter class="mt-8" />
     </main>
     <!-- Confirmation Modal -->
     <transition name="fade">
@@ -904,7 +961,6 @@ function formatLogDetails(details) {
         </svg>
       </button>
     </transition>
-    <AppFooter />
   </div>
 </template>
 

@@ -704,7 +704,9 @@ function handleKeyboardShortcuts(event) {
           <transition name="fade" mode="out-in">
             <div :key="currentQuestion.id" v-if="currentQuestion">
               <div class="flex items-start justify-between gap-4 mb-6">
-                <h2 class="text-xl md:text-2xl font-semibold text-gray-700 leading-tight">
+                <h2
+                  class="text-lg md:text-2xl font-semibold text-gray-700 leading-tight question-text"
+                >
                   {{ currentQuestion.text }}
                 </h2>
                 <div class="relative group flex-shrink-0">
@@ -732,7 +734,7 @@ function handleKeyboardShortcuts(event) {
                     </svg>
                   </button>
                   <div
-                    class="absolute bottom-full right-0 mb-2 w-64 sm:w-72 p-3 text-sm text-white bg-gray-800 rounded-lg opacity-0 group-hover:opacity-95 transition-opacity duration-300 pointer-events-none z-10"
+                    class="tooltip-text absolute bottom-full right-0 mb-2 w-64 sm:w-72 p-3 text-white bg-gray-800 rounded-lg opacity-0 group-hover:opacity-95 transition-opacity duration-300 pointer-events-none z-10"
                     role="tooltip"
                     :class="{ 'opacity-95': activeTooltip === 'question' }"
                   >
@@ -752,7 +754,7 @@ function handleKeyboardShortcuts(event) {
                   role="radio"
                   :aria-checked="answers[currentQuestion.id]?.text === option.text"
                   tabindex="0"
-                  class="w-full cursor-pointer text-left p-4 border-2 rounded-lg text-gray-700 transition-all duration-200 flex items-center justify-between focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                  class="answer-button w-full cursor-pointer text-left p-4 border-2 rounded-lg text-gray-700 transition-all duration-200 flex items-center justify-between focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
                   :class="{
                     'bg-blue-100 border-blue-500 shadow-md':
                       answers[currentQuestion.id]?.text === option.text,
@@ -787,7 +789,7 @@ function handleKeyboardShortcuts(event) {
                     </button>
                     <div
                       :id="`explanation-${currentQuestion.id}-${index}`"
-                      class="absolute bottom-full right-0 mb-2 w-64 sm:w-72 p-3 text-sm text-white bg-gray-800 rounded-lg opacity-0 group-hover:opacity-95 transition-opacity duration-300 pointer-events-none z-10"
+                      class="tooltip-text absolute bottom-full right-0 mb-2 w-64 sm:w-72 p-3 text-white bg-gray-800 rounded-lg opacity-0 group-hover:opacity-95 transition-opacity duration-300 pointer-events-none z-10"
                       role="tooltip"
                       :class="{ 'opacity-95': activeTooltip === `option-${index}` }"
                     >
@@ -1057,5 +1059,18 @@ function handleKeyboardShortcuts(event) {
 }
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
   background: #888;
+}
+
+/* Responsive font sizes for mobile */
+@media (max-width: 640px) {
+  .question-text {
+    font-size: 1.125rem; /* text-lg */
+  }
+  .answer-button {
+    font-size: 0.875rem; /* text-sm */
+  }
+  .tooltip-text {
+    font-size: 0.875rem; /* text-xs */
+  }
 }
 </style>
