@@ -18,6 +18,14 @@ export default {
         sans: ['Inter', 'sans-serif'],
       },
     },
+    screens: {
+      xs: '400px',
+      sm: '640px',
+      md: '768px',
+      lg: '1024px',
+      xl: '1280px',
+      '2xl': '1536px',
+    },
   },
   plugins: [
     // Add any official Tailwind plugins here if you install them later (e.g., @tailwindcss/forms)

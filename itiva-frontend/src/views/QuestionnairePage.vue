@@ -33,6 +33,11 @@ const reportNameInput = ref(null) // Template ref for the report name input
 const isNavigatingAfterSubmit = ref(false) // Flag to bypass the leave guard on successful submission
 const activeTooltip = ref(null) // For tap-to-show tooltips on mobile
 
+// --- Swipe Gesture State ---
+const questionnaireContainer = ref(null) // Template ref for the swipe area
+const touchStartX = ref(0)
+const touchEndX = ref(0)
+
 // Enhanced UX states
 const isSubmitting = ref(false) // Used for the final submission button
 const showKeyboardHelp = ref(true) // Set to true to always show help
@@ -198,10 +203,26 @@ onMounted(() => {
   initializeAssessment(route.params.type)
   // Add keyboard shortcuts
   window.addEventListener('keydown', handleKeyboardShortcuts)
+
+  // Add touch listeners for swipe gestures
+  const container = questionnaireContainer.value
+  if (container) {
+    container.addEventListener('touchstart', handleTouchStart, { passive: true })
+    container.addEventListener('touchmove', handleTouchMove, { passive: true })
+    container.addEventListener('touchend', handleTouchEnd)
+  }
 })
 
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', handleKeyboardShortcuts)
+
+  // Remove touch listeners
+  const container = questionnaireContainer.value
+  if (container) {
+    container.removeEventListener('touchstart', handleTouchStart)
+    container.removeEventListener('touchmove', handleTouchMove)
+    container.removeEventListener('touchend', handleTouchEnd)
+  }
 })
 
 onBeforeRouteUpdate((to, from) => {
@@ -602,6 +623,38 @@ function handleKeyboardShortcuts(event) {
       break
   }
 }
+
+// --- Swipe Gestures ---
+function handleTouchStart(event) {
+  touchStartX.value = event.touches[0].clientX
+  touchEndX.value = 0 // Reset end value
+}
+
+function handleTouchMove(event) {
+  touchEndX.value = event.touches[0].clientX
+}
+
+function handleTouchEnd() {
+  if (touchEndX.value === 0) return // No swipe detected
+
+  const swipeDistance = touchStartX.value - touchEndX.value
+  const minSwipeDistance = 50 // Minimum pixels for a valid swipe
+
+  if (swipeDistance > minSwipeDistance) {
+    // Swiped Left - Next Question
+    // Only navigate if an answer is selected, mimicking the button behavior
+    if (answers.value[currentQuestion.value.id]) {
+      nextQuestion()
+    }
+  } else if (swipeDistance < -minSwipeDistance) {
+    // Swiped Right - Previous Question
+    prevQuestion()
+  }
+
+  // Reset values
+  touchStartX.value = 0
+  touchEndX.value = 0
+}
 </script>
 
 <template>
@@ -616,13 +669,16 @@ function handleKeyboardShortcuts(event) {
     />
 
     <main class="flex-grow flex items-center justify-center p-4">
-      <div class="w-full max-w-3xl bg-white rounded-2xl shadow-2xl p-6 md:p-10 my-8">
+      <div
+        class="w-full max-w-3xl bg-white rounded-2xl shadow-2xl p-3 md:p-10 my-0 md:my-8"
+        ref="questionnaireContainer"
+      >
         <!-- Header Section -->
-        <div class="text-center mb-8">
-          <h1 class="text-xl sm:text-2xl md:text-3xl font-bold text-gray-800 break-words">
+        <div class="text-center mb-6 xs:mb-8">
+          <h1 class="text-base sm:text-xl md:text-2xl font-bold text-gray-800 break-words">
             {{ pageTitle }}
           </h1>
-          <p class="text-gray-500 mt-2">
+          <p class="text-xs md:text-base text-gray-500 mt-2">
             Question {{ currentQuestionIndex + 1 }} of {{ totalQuestions }}
           </p>
           <!-- Draft indicator -->
@@ -671,8 +727,8 @@ function handleKeyboardShortcuts(event) {
         </div>
 
         <!-- Segmented Progress Bar -->
-        <div class="mb-10">
-          <div class="flex w-full h-3 rounded-full overflow-hidden bg-gray-200">
+        <div class="mb-7 xs:mb-10">
+          <div class="flex w-full md:h-3 h-2 rounded-full overflow-hidden bg-gray-200">
             <div
               v-for="category in categories"
               :key="category"
@@ -703,9 +759,9 @@ function handleKeyboardShortcuts(event) {
         <div class="relative">
           <transition name="fade" mode="out-in">
             <div :key="currentQuestion.id" v-if="currentQuestion">
-              <div class="flex items-start justify-between gap-4 mb-6">
+              <div class="flex items-start justify-between xs:gap-4 gap-2 mb-4 md:mb-6">
                 <h2
-                  class="text-lg md:text-2xl font-semibold text-gray-700 leading-tight question-text"
+                  class="xs:text-base md:text-xl font-semibold text-gray-700 leading-tight question-text"
                 >
                   {{ currentQuestion.text }}
                 </h2>
@@ -734,7 +790,7 @@ function handleKeyboardShortcuts(event) {
                     </svg>
                   </button>
                   <div
-                    class="tooltip-text absolute bottom-full right-0 mb-2 w-64 sm:w-72 p-3 text-white bg-gray-800 rounded-lg opacity-0 group-hover:opacity-95 transition-opacity duration-300 pointer-events-none z-10"
+                    class="tooltip-text text-xs xs:text-sm md:text-base absolute bottom-full right-0 mb-2 w-64 sm:w-72 p-3 text-white bg-gray-800 rounded-lg opacity-0 group-hover:opacity-95 transition-opacity duration-300 pointer-events-none z-10"
                     role="tooltip"
                     :class="{ 'opacity-95': activeTooltip === 'question' }"
                   >
@@ -742,7 +798,7 @@ function handleKeyboardShortcuts(event) {
                   </div>
                 </div>
               </div>
-              <div class="space-y-4">
+              <div class="space-y-2 xs:space-y-4">
                 <button
                   v-for="(option, index) in currentQuestion.options"
                   :key="option.text"
@@ -754,7 +810,7 @@ function handleKeyboardShortcuts(event) {
                   role="radio"
                   :aria-checked="answers[currentQuestion.id]?.text === option.text"
                   tabindex="0"
-                  class="answer-button w-full cursor-pointer text-left p-4 border-2 rounded-lg text-gray-700 transition-all duration-200 flex items-center justify-between focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                  class="answer-button w-full cursor-pointer text-left px-2 py-1 xs:p-3 md:p-4 border-2 rounded-lg text-gray-700 transition-all duration-200 flex items-center justify-between focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 text-xs xs:!text-sm md:text-lg"
                   :class="{
                     'bg-blue-100 border-blue-500 shadow-md':
                       answers[currentQuestion.id]?.text === option.text,
@@ -762,7 +818,7 @@ function handleKeyboardShortcuts(event) {
                       answers[currentQuestion.id]?.text !== option.text,
                   }"
                 >
-                  <span class="flex-1 mr-4">{{ option.text }}</span>
+                  <span class="flex-1 mr-2 xs:mr-4">{{ option.text }}</span>
                   <div class="relative group flex-shrink-0">
                     <button
                       type="button"
@@ -789,7 +845,7 @@ function handleKeyboardShortcuts(event) {
                     </button>
                     <div
                       :id="`explanation-${currentQuestion.id}-${index}`"
-                      class="tooltip-text absolute bottom-full right-0 mb-2 w-64 sm:w-72 p-3 text-white bg-gray-800 rounded-lg opacity-0 group-hover:opacity-95 transition-opacity duration-300 pointer-events-none z-10"
+                      class="tooltip-text text-xs xs:text-sm md:text-base absolute bottom-full right-0 mb-2 w-64 sm:w-72 p-3 text-white bg-gray-800 rounded-lg opacity-0 group-hover:opacity-95 transition-opacity duration-300 pointer-events-none z-10"
                       role="tooltip"
                       :class="{ 'opacity-95': activeTooltip === `option-${index}` }"
                     >
@@ -803,7 +859,7 @@ function handleKeyboardShortcuts(event) {
         </div>
 
         <!-- Navigation Buttons -->
-        <div class="flex justify-between items-center mt-8 pt-6 border-t">
+        <div class="flex justify-between items-center mt-6 xs:mt-8 pt-6 xs:pt-3 border-t">
           <button
             @click="prevQuestion"
             @keydown.enter="prevQuestion"
@@ -1059,18 +1115,5 @@ function handleKeyboardShortcuts(event) {
 }
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
   background: #888;
-}
-
-/* Responsive font sizes for mobile */
-@media (max-width: 640px) {
-  .question-text {
-    font-size: 1.125rem; /* text-lg */
-  }
-  .answer-button {
-    font-size: 0.875rem; /* text-sm */
-  }
-  .tooltip-text {
-    font-size: 0.875rem; /* text-xs */
-  }
 }
 </style>
