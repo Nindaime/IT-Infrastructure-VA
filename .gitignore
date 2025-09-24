@@ -1,0 +1,6 @@
+# Ignore UML directory
+UMLs/
+
+# Ignore specific spec documents
+**/Features to Add.txt
+**/System Specs.docx
